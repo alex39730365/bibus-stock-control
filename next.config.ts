@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: __dirname,
+  outputFileTracingRoot: path.join(__dirname),
+  serverExternalPackages: ["xlsx"],
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",

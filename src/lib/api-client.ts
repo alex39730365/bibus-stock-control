@@ -13,11 +13,21 @@ async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    ...options,
-  });
-  return res.json() as Promise<ApiResponse<T>>;
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      credentials: "same-origin",
+      ...options,
+    });
+    const data = (await res.json()) as ApiResponse<T>;
+    if (!res.ok && !data.error) {
+      return { success: false, error: res.statusText || "Request failed" };
+    }
+    return data;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Network error";
+    return { success: false, error: msg };
+  }
 }
 
 export type InventoryQuery = InventoryFilter & {

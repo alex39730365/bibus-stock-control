@@ -3,7 +3,7 @@ import {
   createSessionToken,
   getAdminCredentials,
   sessionCookieOptions,
-} from "@/lib/auth";
+} from "@/lib/auth-session";
 import type { ApiResponse } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const token = createSessionToken(username);
+    const token = await createSessionToken(username);
     const res = NextResponse.json<ApiResponse<{ username: string }>>({
       success: true,
       data: { username },

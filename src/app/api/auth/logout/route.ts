@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clearSessionCookieOptions } from "@/lib/auth";
+import { clearSessionCookieOptions } from "@/lib/auth-session";
 import type { ApiResponse } from "@/lib/types";
 
 export async function POST() {

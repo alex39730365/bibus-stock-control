@@ -1,31 +1,33 @@
 import { promises as fs } from "fs";
-import path from "path";
 import type { InventoryItem, InventoryStats, Region } from "./types";
 import { getStockStatus } from "./types";
 import { normalizeInventory, resolveRegion } from "./regions";
+import { getDataDir, getInventoryPath } from "./data-path";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "inventory.json");
+function inventoryFile(): string {
+  return getInventoryPath();
+}
 
 async function ensureDataFile(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(getDataDir(), { recursive: true });
+  const file = inventoryFile();
   try {
-    await fs.access(DATA_FILE);
+    await fs.access(file);
   } catch {
-    await fs.writeFile(DATA_FILE, "[]", "utf-8");
+    await fs.writeFile(file, "[]", "utf-8");
   }
 }
 
 export async function readInventory(): Promise<InventoryItem[]> {
   await ensureDataFile();
-  const raw = await fs.readFile(DATA_FILE, "utf-8");
+  const raw = await fs.readFile(inventoryFile(), "utf-8");
   const items = JSON.parse(raw) as InventoryItem[];
   return normalizeInventory(items);
 }
 
 export async function writeInventory(items: InventoryItem[]): Promise<void> {
   await ensureDataFile();
-  await fs.writeFile(DATA_FILE, JSON.stringify(items, null, 2), "utf-8");
+  await fs.writeFile(inventoryFile(), JSON.stringify(items, null, 2), "utf-8");
 }
 
 export async function getItemById(id: string): Promise<InventoryItem | undefined> {
