@@ -23,30 +23,43 @@ Your URL will be something like:
 
 | Field | Value |
 |-------|--------|
-| Framework preset | **None** (or **Next.js** if listed) |
-| **Build command** | `npm install && npx opennextjs-cloudflare build` |
+| Framework preset | **None** ← do **not** use old “Next.js (Pages)” preset |
+| **Build command** | `npm install && npm run build:cf` |
 | **Build output directory** | **leave empty** (do **not** use `/`) |
 | **Deploy command** (if shown) | `npx opennextjs-cloudflare deploy` |
 
 If there is only one command field, use:
 
 ```bash
-npm install && npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy
+npm install && npm run build:cf && npx opennextjs-cloudflare deploy
 ```
 
 `wrangler.jsonc` is already in the repo — Cloudflare will use it.
+
 5. **Environment variables** → **Variables and Secrets** (Production):
 
 | Variable | Value |
 |----------|--------|
 | `ADMIN_USERNAME` | your admin ID |
 | `ADMIN_PASSWORD` | strong password |
-| `ADMIN_SECRET` | 32+ char random |
+| `ADMIN_SECRET` | 32+ char random (run a generator — **not** a PowerShell command string) |
 | `UPSTASH_REDIS_REST_URL` | from Upstash |
 | `UPSTASH_REDIS_REST_TOKEN` | from Upstash |
 | `NODE_VERSION` | `20` |
 
 6. Deploy → open the `*.workers.dev` URL → `/login`
+
+### Build failed with “export const runtime = 'edge'” (⚡️)
+
+That message is from **`@cloudflare/next-on-pages`** (old Pages adapter).  
+**Do not add** `export const runtime = 'edge'` to the code.
+
+Fix:
+
+1. Framework preset → **None**
+2. Build command → **`npm install && npm run build:cf`**
+3. **Never** use `npx @cloudflare/next-on-pages` or only `npm run build` with output directory `/`
+4. Use **Workers** (Git), not a static “upload folder `/`” project
 
 ## 3. Deploy from your PC (CLI)
 
