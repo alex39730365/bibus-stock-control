@@ -1,6 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { getDataDir, getInventoryPath, getMovementsPath, getSeedDataDir } from "@/lib/data-path";
+import { getDataDir, getSeedDataDir } from "./data-path";
+
+let seedPromise: Promise<void> | null = null;
 
 async function copySeedIfMissing(filename: string): Promise<void> {
   const target = path.join(getDataDir(), filename);
@@ -22,14 +24,17 @@ async function copySeedIfMissing(filename: string): Promise<void> {
   }
 }
 
-export async function registerNode(): Promise<void> {
-  try {
-    await fs.mkdir(getDataDir(), { recursive: true });
-    await copySeedIfMissing("inventory.json");
-    await copySeedIfMissing("movements.json");
-    console.log(`[data] Inventory: ${getInventoryPath()}`);
-    console.log(`[data] Movements: ${getMovementsPath()}`);
-  } catch (err) {
-    console.error("[data] Startup seed failed (app will still start):", err);
+/** Copy bundled inventory/movements into DATA_PATH once (non-blocking for HTTP server). */
+export function ensureSeedData(): Promise<void> {
+  if (!seedPromise) {
+    seedPromise = (async () => {
+      try {
+        await copySeedIfMissing("inventory.json");
+        await copySeedIfMissing("movements.json");
+      } catch (err) {
+        console.error("[data] Seed failed:", err);
+      }
+    })();
   }
+  return seedPromise;
 }

@@ -3,6 +3,7 @@ import type { InventoryItem, InventoryStats, Region } from "./types";
 import { getStockStatus } from "./types";
 import { normalizeInventory, resolveRegion } from "./regions";
 import { getDataDir, getInventoryPath } from "./data-path";
+import { ensureSeedData } from "./seed-data";
 
 function inventoryFile(): string {
   return getInventoryPath();
@@ -19,6 +20,7 @@ async function ensureDataFile(): Promise<void> {
 }
 
 export async function readInventory(): Promise<InventoryItem[]> {
+  await ensureSeedData();
   await ensureDataFile();
   const raw = await fs.readFile(inventoryFile(), "utf-8");
   const items = JSON.parse(raw) as InventoryItem[];

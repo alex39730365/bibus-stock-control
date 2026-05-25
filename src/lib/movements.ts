@@ -3,6 +3,7 @@ import type { InventoryItem, MovementType, StockMovement } from "./types";
 import { getItemById, upsertItem } from "./storage";
 import { generateId } from "./storage";
 import { getDataDir, getMovementsPath } from "./data-path";
+import { ensureSeedData } from "./seed-data";
 
 function movementsFile(): string {
   return getMovementsPath();
@@ -19,6 +20,7 @@ async function ensureFile(): Promise<void> {
 }
 
 export async function readMovements(): Promise<StockMovement[]> {
+  await ensureSeedData();
   await ensureFile();
   const raw = await fs.readFile(movementsFile(), "utf-8");
   const items = JSON.parse(raw) as StockMovement[];

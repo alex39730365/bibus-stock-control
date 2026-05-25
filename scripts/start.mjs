@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const port = Number(process.env.PORT) || 3000;
+/** Railway v2: set HOSTNAME=:: if healthchecks fail; default 0.0.0.0 */
 const host = process.env.HOSTNAME || "0.0.0.0";
 
 if (!Number.isFinite(port) || port < 1 || port > 65535) {
