@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StatsCards } from "@/components/StatsCards";
 import { RegionFilter, RegionBadge, type RegionFilterValue } from "@/components/RegionFilter";
 import { Pagination } from "@/components/Pagination";
@@ -34,6 +34,10 @@ export default function DashboardPage() {
   const [alertTotal, setAlertTotal] = useState(0);
   const [alertTotalPages, setAlertTotalPages] = useState(1);
   const [alertsLoading, setAlertsLoading] = useState(true);
+  const [locationsRegion, setLocationsRegion] = useState<RegionFilterValue>("");
+  const [locationsStats, setLocationsStats] = useState<InventoryStats | null>(null);
+  const alertsSectionRef = useRef<HTMLElement>(null);
+  const scrollLockY = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setAlertsLoading(true);
@@ -63,6 +67,20 @@ export default function DashboardPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    (async () => {
+      const res = await fetchStats(locationsRegion || undefined);
+      if (res.success && res.data) setLocationsStats(res.data);
+    })();
+  }, [locationsRegion]);
+
+  useEffect(() => {
+    if (!alertsLoading && scrollLockY.current !== null) {
+      window.scrollTo({ top: scrollLockY.current, left: 0, behavior: "instant" });
+      scrollLockY.current = null;
+    }
+  }, [alertsLoading, alertItems]);
+
   const onRegionChange = (value: RegionFilterValue) => {
     setRegion(value);
     setAlertPage(1);
@@ -71,6 +89,11 @@ export default function DashboardPage() {
   const onAlertStatusChange = (value: AlertStatusFilter) => {
     setAlertStatus(value);
     setAlertPage(1);
+  };
+
+  const onAlertPageChange = (page: number) => {
+    scrollLockY.current = window.scrollY;
+    setAlertPage(page);
   };
 
   const regionLabel = region
@@ -114,7 +137,7 @@ export default function DashboardPage() {
 
       {stats && <StatsCards stats={stats} />}
 
-      <section className="mt-8">
+      <section ref={alertsSectionRef} className="mt-8 scroll-mt-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-gray-800">
             Stock Alerts
@@ -141,17 +164,23 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
-        {alertsLoading ? (
-          <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
-            Loading alerts…
-          </p>
-        ) : alertItems.length === 0 ? (
+        {alertItems.length === 0 && !alertsLoading ? (
           <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
             No items match this alert filter for the selected region.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
+          <div className="relative min-h-[280px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            {alertsLoading && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 text-sm text-gray-500"
+                aria-busy="true"
+              >
+                Loading…
+              </div>
+            )}
+            <table
+              className={`w-full text-sm transition-opacity ${alertsLoading ? "opacity-60" : ""}`}
+            >
               <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
                 <tr>
                   <th className="px-4 py-3 text-left">Region</th>
@@ -197,7 +226,7 @@ export default function DashboardPage() {
                 page={alertPage}
                 totalPages={alertTotalPages}
                 total={alertTotal}
-                onPageChange={setAlertPage}
+                onPageChange={onAlertPageChange}
               />
             )}
           </div>
@@ -238,9 +267,18 @@ export default function DashboardPage() {
             </ul>
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 font-semibold text-gray-800">Top Locations</h3>
+            <div className="mb-3 flex flex-col gap-3">
+              <h3 className="font-semibold text-gray-800">Top Locations</h3>
+              <p className="text-xs text-gray-500">By subsidiary branch</p>
+              <RegionFilter
+                compact
+                value={locationsRegion}
+                onChange={setLocationsRegion}
+                counts={stats.byRegion}
+              />
+            </div>
             <ul className="space-y-2">
-              {Object.entries(stats.byLocation)
+              {Object.entries(locationsStats?.byLocation ?? stats.byLocation)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 8)
                 .map(([loc, count]) => (
@@ -250,6 +288,11 @@ export default function DashboardPage() {
                   </li>
                 ))}
             </ul>
+            {locationsRegion && (
+              <p className="mt-3 text-xs text-gray-400">
+                {REGION_META[locationsRegion].label} — {REGION_META[locationsRegion].country}
+              </p>
+            )}
           </div>
         </section>
       )}

@@ -10,9 +10,11 @@ interface Props {
   value: RegionFilterValue;
   onChange: (value: RegionFilterValue) => void;
   counts?: Partial<Record<Region, number>>;
+  /** Smaller pills for panels (e.g. Top Locations) */
+  compact?: boolean;
 }
 
-export function RegionFilter({ value, onChange, counts }: Props) {
+export function RegionFilter({ value, onChange, counts, compact }: Props) {
   const tabs: { id: RegionFilterValue; label: string; sub?: string }[] = [
     { id: "", label: "All regions" },
     ...REGIONS.map((r) => ({
@@ -38,7 +40,8 @@ export function RegionFilter({ value, onChange, counts }: Props) {
             type="button"
             onClick={() => onChange(tab.id)}
             className={clsx(
-              "rounded-lg border px-4 py-2.5 text-left text-sm transition-colors",
+              "rounded-lg border text-left transition-colors",
+              compact ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm",
               active
                 ? "border-[#396bea] bg-[#396bea] text-white shadow-sm"
                 : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
