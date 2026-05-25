@@ -237,7 +237,7 @@ export function exportToExcelBuffer(items: InventoryItem[]): ArrayBuffer {
     minStock: i.minStock,
     supplier: i.supplier,
     notes: i.notes,
-    updatedAt: i.updatedAt,
+    updatedAt: formatDateTime(i.updatedAt),
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
