@@ -34,12 +34,13 @@ export interface ParsedArticleCode {
   productForm: ProductForm;
 }
 
+/** Suffix (e.g. C = coil) overrides embedded form code (e.g. BA = bar) */
 function resolveProductForm(
   formLabel: ProductForm | null,
   suffixLabel: ProductForm | null
 ): ProductForm {
-  if (formLabel) return formLabel;
   if (suffixLabel) return suffixLabel;
+  if (formLabel) return formLabel;
   return "other";
 }
 

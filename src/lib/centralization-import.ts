@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { InventoryItem, ProductForm } from "./types";
-import { defaultUnitForForm } from "./types";
+import { defaultUnitForForm, deriveMinStock } from "./types";
 import { generateId } from "./storage";
 import {
   formatArticleCodeNotes,
@@ -76,18 +76,37 @@ function parseBMAGRows(rows: unknown[][]): InventoryItem[] {
       r[5]
     );
 
+    const quantity = Number(String(r[6] ?? "").replace(/,/g, "")) || 0;
+    const productForm = parsed.productForm;
+    const minStock = deriveMinStock({
+      id: "",
+      region: "BMAG",
+      articleNo,
+      material: "",
+      alloy: "",
+      productForm,
+      dimensions: "",
+      quantity,
+      unit: "kg",
+      location: "",
+      minStock: 0,
+      supplier: "",
+      notes: "",
+      updatedAt: "",
+    });
+
     items.push({
       id: generateId(),
       region: "BMAG",
       articleNo,
       material: "",
       alloy: "",
-      productForm: parsed.productForm,
+      productForm,
       dimensions: formatDimensions(r[3], r[4], r[5]),
-      quantity: Number(String(r[6] ?? "").replace(/,/g, "")) || 0,
-      unit: defaultUnitForForm(parsed.productForm),
+      quantity,
+      unit: defaultUnitForForm(productForm),
       location: location || "BMAG",
-      minStock: 0,
+      minStock,
       supplier: "BIBUS METALS AG",
       notes: [
         heat && `Heat: ${heat}`,
@@ -114,9 +133,20 @@ function parseBMCNRows(rows: unknown[][]): InventoryItem[] {
     const codeStr = String(code).trim();
     const codeParsed = parseArticleCode(codeStr);
     const mill = String(r[4] ?? "").trim();
-    const productForm = codeParsed.formCode
+    const productForm = codeParsed.suffixLabel
       ? codeParsed.productForm
-      : nameParsed.productForm;
+      : codeParsed.formCode
+        ? codeParsed.productForm
+        : nameParsed.productForm;
+
+    const quantity = Number(String(r[2] ?? "").replace(/,/g, "")) || 0;
+    const draft = {
+      region: "BMCN" as const,
+      quantity,
+      minStock: 0,
+      productForm,
+    };
+    const minStock = deriveMinStock(draft as InventoryItem);
 
     items.push({
       id: generateId(),
@@ -126,10 +156,10 @@ function parseBMCNRows(rows: unknown[][]): InventoryItem[] {
       alloy: nameParsed.alloy,
       productForm,
       dimensions: name.match(/\[[^\]]+\]/)?.[0] ?? "",
-      quantity: Number(String(r[2] ?? "").replace(/,/g, "")) || 0,
+      quantity,
       unit: String(r[3] ?? defaultUnitForForm(productForm)).trim(),
       location: "BMCN",
-      minStock: 0,
+      minStock,
       supplier: mill || "BIBUS CN",
       notes: [
         name && `Spec: ${name}`,

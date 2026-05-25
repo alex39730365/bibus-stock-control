@@ -1,4 +1,5 @@
 import type { InventoryItem, Region } from "./types";
+import { deriveMinStock } from "./types";
 import {
   formatArticleCodeNotes,
   parseArticleCode,
@@ -49,7 +50,10 @@ function applyArticleCodeForm(item: InventoryItem): InventoryItem {
 }
 
 export function normalizeItem(item: InventoryItem): InventoryItem {
-  return applyArticleCodeForm({ ...item, region: resolveRegion(item) });
+  const base = applyArticleCodeForm({ ...item, region: resolveRegion(item) });
+  const minStock =
+    base.minStock > 0 ? base.minStock : deriveMinStock(base);
+  return { ...base, minStock };
 }
 
 export function normalizeInventory(items: InventoryItem[]): InventoryItem[] {

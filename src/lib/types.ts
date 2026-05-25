@@ -112,9 +112,17 @@ export type InventoryFilter = {
   status?: StockStatus | "alert" | "";
 };
 
+/** Reorder point when ERP min stock is missing (centralization import uses 0) */
+export function deriveMinStock(item: InventoryItem): number {
+  if (item.minStock > 0) return item.minStock;
+  if (item.quantity <= 0) return 0;
+  return Math.max(1, Math.ceil(item.quantity * 0.3));
+}
+
 export function getStockStatus(item: InventoryItem): StockStatus {
   if (item.quantity <= 0) return "out";
-  if (item.quantity <= item.minStock) return "low";
+  const min = deriveMinStock(item);
+  if (min > 0 && item.quantity <= min) return "low";
   return "ok";
 }
 
