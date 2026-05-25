@@ -1,0 +1,6 @@
+NEXTJS_ENV=development
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change-me
+ADMIN_SECRET=change-me-long-random-string
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=

@@ -42,9 +42,14 @@ ADMIN_SECRET=long-random-secret-string
 | Stock Movements | Full audit trail (who, when, delta) |
 | Data Import | Excel bulk import |
 
-## Deploy (Vercel)
+## Deploy
 
-See **[DEPLOY-VERCEL.md](./DEPLOY-VERCEL.md)** — import from GitHub, add **Upstash Redis**, set admin env vars.
+| Platform | Guide |
+|----------|--------|
+| **Cloudflare** | [DEPLOY-CLOUDFLARE.md](./DEPLOY-CLOUDFLARE.md) |
+| **Vercel** | Import GitHub repo + Upstash env vars (same Redis keys) |
+
+Both use **Upstash Redis** for stock data. URL will differ (`workers.dev` vs `vercel.app`).
 
 ## Data storage
 

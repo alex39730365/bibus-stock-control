@@ -34,9 +34,10 @@ git remote set-url origin https://github.com/alex39730365/bibus-stock-control.gi
 git push -u origin main
 ```
 
-## 3. Vercel 배포
+## 3. 배포
 
-`DEPLOY-VERCEL.md` 참고 — [vercel.com/new](https://vercel.com/new)에서 repo import 후 **Upstash Redis** 연결
+- **Cloudflare:** [DEPLOY-CLOUDFLARE.md](./DEPLOY-CLOUDFLARE.md) — GitHub 연결, Upstash Redis, `*.workers.dev` URL  
+- **Vercel:** [vercel.com/new](https://vercel.com/new) — `*.vercel.app` URL (팀 대역폭 한도 주의)
 
 ## 4. Personal Access Token (로그인 실패 시)
 
