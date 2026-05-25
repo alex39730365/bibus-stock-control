@@ -1,28 +1,10 @@
-import { promises as fs } from "fs";
 import type { InventoryItem, MovementType, StockMovement } from "./types";
 import { getItemById, upsertItem } from "./storage";
 import { generateId } from "./storage";
-import { getDataDir, getMovementsPath } from "./data-path";
-import { ensureSeedData } from "./seed-data";
-
-function movementsFile(): string {
-  return getMovementsPath();
-}
-
-async function ensureFile(): Promise<void> {
-  await fs.mkdir(getDataDir(), { recursive: true });
-  const file = movementsFile();
-  try {
-    await fs.access(file);
-  } catch {
-    await fs.writeFile(file, "[]", "utf-8");
-  }
-}
+import { readJsonStore, writeJsonStore } from "./json-store";
 
 export async function readMovements(): Promise<StockMovement[]> {
-  await ensureSeedData();
-  await ensureFile();
-  const raw = await fs.readFile(movementsFile(), "utf-8");
+  const raw = await readJsonStore("movements");
   const items = JSON.parse(raw) as StockMovement[];
   return items.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -30,8 +12,7 @@ export async function readMovements(): Promise<StockMovement[]> {
 }
 
 async function writeMovements(items: StockMovement[]): Promise<void> {
-  await ensureFile();
-  await fs.writeFile(movementsFile(), JSON.stringify(items, null, 2), "utf-8");
+  await writeJsonStore("movements", JSON.stringify(items, null, 2));
 }
 
 export async function recordMovement(params: {

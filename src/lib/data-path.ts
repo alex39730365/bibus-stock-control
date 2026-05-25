@@ -1,6 +1,6 @@
 import path from "path";
 
-/** Persistent data directory (Railway volume: set DATA_PATH=/data) */
+/** Local data directory (optional DATA_PATH; Vercel uses KV instead) */
 export function getDataDir(): string {
   const base = process.env.DATA_PATH?.trim();
   if (base) return path.isAbsolute(base) ? base : path.join(process.cwd(), base);

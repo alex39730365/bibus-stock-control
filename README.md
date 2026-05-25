@@ -42,12 +42,16 @@ ADMIN_SECRET=long-random-secret-string
 | Stock Movements | Full audit trail (who, when, delta) |
 | Data Import | Excel bulk import |
 
-## Data files
+## Deploy (Vercel)
 
-| File | Content |
-|------|---------|
-| `data/inventory.json` | Stock items |
-| `data/movements.json` | Movement audit log (last 5000) |
+See **[DEPLOY-VERCEL.md](./DEPLOY-VERCEL.md)** — import from GitHub, add **Upstash Redis**, set admin env vars.
+
+## Data storage
+
+| Environment | Storage |
+|-------------|---------|
+| Local `npm run dev` | `data/inventory.json`, `data/movements.json` |
+| Vercel | **Upstash Redis** (required) — seeded from bundled `data/` on first use |
 
 ## API (auth required)
 

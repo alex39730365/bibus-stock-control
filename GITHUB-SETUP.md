@@ -34,11 +34,9 @@ git remote set-url origin https://github.com/alex39730365/bibus-stock-control.gi
 git push -u origin main
 ```
 
-## 3. Railway와 연결 (선택)
+## 3. Vercel 배포
 
-1. [Railway](https://railway.app) → New Project → **Deploy from GitHub repo**
-2. `alex39730365/bibus-stock-control` 선택
-3. 환경 변수·Volume 설정은 `DEPLOY-RAILWAY.md` 참고
+`DEPLOY-VERCEL.md` 참고 — [vercel.com/new](https://vercel.com/new)에서 repo import 후 **Upstash Redis** 연결
 
 ## 4. Personal Access Token (로그인 실패 시)
 

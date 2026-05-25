@@ -1,35 +1,16 @@
-import { promises as fs } from "fs";
 import type { InventoryItem, InventoryStats, Region } from "./types";
 import { getStockStatus } from "./types";
 import { normalizeInventory, resolveRegion } from "./regions";
-import { getDataDir, getInventoryPath } from "./data-path";
-import { ensureSeedData } from "./seed-data";
-
-function inventoryFile(): string {
-  return getInventoryPath();
-}
-
-async function ensureDataFile(): Promise<void> {
-  await fs.mkdir(getDataDir(), { recursive: true });
-  const file = inventoryFile();
-  try {
-    await fs.access(file);
-  } catch {
-    await fs.writeFile(file, "[]", "utf-8");
-  }
-}
+import { readJsonStore, writeJsonStore } from "./json-store";
 
 export async function readInventory(): Promise<InventoryItem[]> {
-  await ensureSeedData();
-  await ensureDataFile();
-  const raw = await fs.readFile(inventoryFile(), "utf-8");
+  const raw = await readJsonStore("inventory");
   const items = JSON.parse(raw) as InventoryItem[];
   return normalizeInventory(items);
 }
 
 export async function writeInventory(items: InventoryItem[]): Promise<void> {
-  await ensureDataFile();
-  await fs.writeFile(inventoryFile(), JSON.stringify(items, null, 2), "utf-8");
+  await writeJsonStore("inventory", JSON.stringify(items, null, 2));
 }
 
 export async function getItemById(id: string): Promise<InventoryItem | undefined> {
