@@ -23,9 +23,13 @@ async function copySeedIfMissing(filename: string): Promise<void> {
 }
 
 export async function registerNode(): Promise<void> {
-  await fs.mkdir(getDataDir(), { recursive: true });
-  await copySeedIfMissing("inventory.json");
-  await copySeedIfMissing("movements.json");
-  console.log(`[data] Inventory: ${getInventoryPath()}`);
-  console.log(`[data] Movements: ${getMovementsPath()}`);
+  try {
+    await fs.mkdir(getDataDir(), { recursive: true });
+    await copySeedIfMissing("inventory.json");
+    await copySeedIfMissing("movements.json");
+    console.log(`[data] Inventory: ${getInventoryPath()}`);
+    console.log(`[data] Movements: ${getMovementsPath()}`);
+  } catch (err) {
+    console.error("[data] Startup seed failed (app will still start):", err);
+  }
 }

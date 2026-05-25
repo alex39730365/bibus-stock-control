@@ -10,8 +10,19 @@ git push -u origin master
 ## 2. Create Railway project
 
 1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-2. Select this repository
+2. Select repository **`bibus-stock-control`** (search the full name — `bibus` alone may not match)
 3. Railway detects Next.js via `railway.toml` / Nixpacks
+
+### Repository not listed on Railway?
+
+1. Open [GitHub → Settings → Applications → Railway](https://github.com/settings/installations) (install [Railway GitHub App](https://github.com/apps/railway-app) if missing).
+2. Click **Configure** on Railway → **Repository access**:
+   - **All repositories**, or
+   - **Only select repositories** → add **`bibus-stock-control`**
+3. Back in Railway: **New Project** → refresh the repo list (or log out/in with the same GitHub account `alex39730365`).
+4. Still missing? Use **Empty Project** → service **Settings** → **Connect Repo** → pick `alex39730365/bibus-stock-control`.
+
+Repo URL: https://github.com/alex39730365/bibus-stock-control
 
 ## 3. Environment variables
 
@@ -40,7 +51,19 @@ On first start, bundled `data/inventory.json` is copied into the volume if empty
 
 Railway → **Settings** → **Networking** → **Generate Domain**
 
-Open `https://your-app.up.railway.app` → sign in with `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+### Port (fixes “Application failed to respond”)
+
+Railway sets a **`PORT`** variable (often **not** 3000). The app must use the **same** port:
+
+1. **Variables** → note **`PORT`** (e.g. `8080`), **or** add `PORT` = `3000` and redeploy.
+2. **Generate Domain** → enter that **exact** number (not a guess).
+3. After this repo update, `npm start` binds to `$PORT` automatically.
+
+Quick test URL: `https://your-app.up.railway.app/api/health` → should return `{"ok":true}`.
+
+Open `https://your-app.up.railway.app/login` → sign in with `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+
+**`DATA_PATH=/data` without a Volume:** remove `DATA_PATH` until the volume exists, or add a Volume at `/data`.
 
 ## 6. Updates
 
