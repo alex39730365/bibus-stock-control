@@ -3,43 +3,75 @@
 import { useCallback, useEffect, useState } from "react";
 import { StatsCards } from "@/components/StatsCards";
 import { RegionFilter, RegionBadge, type RegionFilterValue } from "@/components/RegionFilter";
+import { Pagination } from "@/components/Pagination";
 import { fetchInventory, fetchStats, getExportUrl } from "@/lib/api-client";
-import type { InventoryItem, InventoryStats, Region } from "@/lib/types";
+import type { InventoryItem, InventoryStats, Region, StockStatus } from "@/lib/types";
 import { getStockStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import Link from "next/link";
 import { ArrowRight, Download } from "lucide-react";
 import { REGION_META } from "@/lib/regions";
 
+const ALERTS_PAGE_SIZE = 10;
+
+type AlertStatusFilter = "alert" | StockStatus;
+
+const ALERT_TABS: { id: AlertStatusFilter; label: string }[] = [
+  { id: "alert", label: "All alerts" },
+  { id: "low", label: "Low stock" },
+  { id: "out", label: "Out of stock" },
+];
+
 export default function DashboardPage() {
   const [region, setRegion] = useState<RegionFilterValue>("");
+  const [alertStatus, setAlertStatus] = useState<AlertStatusFilter>("alert");
+  const [alertPage, setAlertPage] = useState(1);
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [regionCounts, setRegionCounts] = useState<Partial<Record<Region, number>>>(
     {}
   );
-  const [lowItems, setLowItems] = useState<InventoryItem[]>([]);
+  const [alertItems, setAlertItems] = useState<InventoryItem[]>([]);
+  const [alertTotal, setAlertTotal] = useState(0);
+  const [alertTotalPages, setAlertTotalPages] = useState(1);
+  const [alertsLoading, setAlertsLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [allStatsRes, statsRes, lowRes, outRes] = await Promise.all([
+    setAlertsLoading(true);
+    const [allStatsRes, statsRes, alertsRes] = await Promise.all([
       fetchStats(),
       fetchStats(region || undefined),
-      fetchInventory({ status: "low", region: region || undefined }),
-      fetchInventory({ status: "out", region: region || undefined }),
+      fetchInventory({
+        status: alertStatus,
+        region: region || undefined,
+        page: alertPage,
+        limit: ALERTS_PAGE_SIZE,
+      }),
     ]);
     if (allStatsRes.success && allStatsRes.data) {
       setRegionCounts(allStatsRes.data.byRegion);
     }
     if (statsRes.success && statsRes.data) setStats(statsRes.data);
-    const alerts = [
-      ...(lowRes.data ?? []),
-      ...(outRes.data ?? []),
-    ].slice(0, 8);
-    setLowItems(alerts);
-  }, [region]);
+    if (alertsRes.success && alertsRes.data) {
+      setAlertItems(alertsRes.data);
+      setAlertTotal(alertsRes.meta?.total ?? alertsRes.data.length);
+      setAlertTotalPages(alertsRes.meta?.totalPages ?? 1);
+    }
+    setAlertsLoading(false);
+  }, [region, alertStatus, alertPage]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const onRegionChange = (value: RegionFilterValue) => {
+    setRegion(value);
+    setAlertPage(1);
+  };
+
+  const onAlertStatusChange = (value: AlertStatusFilter) => {
+    setAlertStatus(value);
+    setAlertPage(1);
+  };
 
   const regionLabel = region
     ? `${REGION_META[region].label} (${REGION_META[region].country})`
@@ -75,7 +107,7 @@ export default function DashboardPage() {
       <div className="mb-6">
         <RegionFilter
           value={region}
-          onChange={setRegion}
+          onChange={onRegionChange}
           counts={regionCounts}
         />
       </div>
@@ -83,17 +115,39 @@ export default function DashboardPage() {
       {stats && <StatsCards stats={stats} />}
 
       <section className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">
-          Stock Alerts
-          {region && (
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              — {regionLabel}
-            </span>
-          )}
-        </h2>
-        {lowItems.length === 0 ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Stock Alerts
+            {region && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                — {regionLabel}
+              </span>
+            )}
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {ALERT_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onAlertStatusChange(tab.id)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  alertStatus === tab.id
+                    ? "bg-[#396bea] text-white"
+                    : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {alertsLoading ? (
           <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
-            No low-stock or out-of-stock items for this region.
+            Loading alerts…
+          </p>
+        ) : alertItems.length === 0 ? (
+          <p className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
+            No items match this alert filter for the selected region.
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -109,7 +163,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {lowItems.map((item) => (
+                {alertItems.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <RegionBadge region={item.region} />
@@ -118,7 +172,12 @@ export default function DashboardPage() {
                       <StatusBadge status={getStockStatus(item)} />
                     </td>
                     <td className="px-4 py-3 font-mono text-[#396bea]">
-                      {item.articleNo}
+                      <Link
+                        href={`/inventory?search=${encodeURIComponent(item.articleNo)}`}
+                        className="hover:underline"
+                      >
+                        {item.articleNo}
+                      </Link>
                     </td>
                     <td className="px-4 py-3">
                       {item.material} {item.alloy && `· ${item.alloy}`}
@@ -133,7 +192,22 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            {alertTotalPages > 1 && (
+              <Pagination
+                page={alertPage}
+                totalPages={alertTotalPages}
+                total={alertTotal}
+                onPageChange={setAlertPage}
+              />
+            )}
           </div>
+        )}
+        {!alertsLoading && alertTotal > 0 && (
+          <p className="mt-2 text-xs text-gray-500">
+            {alertTotalPages > 1
+              ? `Page ${alertPage} of ${alertTotalPages} · ${alertTotal.toLocaleString()} alerts`
+              : `${alertTotal.toLocaleString()} alert${alertTotal === 1 ? "" : "s"}`}
+          </p>
         )}
       </section>
 

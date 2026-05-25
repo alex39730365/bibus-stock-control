@@ -34,7 +34,10 @@ function filterItems(
     if (productForm && item.productForm !== productForm) return false;
     if (location && !item.location.toLowerCase().includes(location))
       return false;
-    if (status && getStockStatus(item) !== status) return false;
+    if (status === "alert") {
+      const s = getStockStatus(item);
+      if (s !== "low" && s !== "out") return false;
+    } else if (status && getStockStatus(item) !== status) return false;
     return true;
   });
 }

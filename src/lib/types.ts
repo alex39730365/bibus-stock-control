@@ -108,7 +108,8 @@ export type InventoryFilter = {
   region?: Region | "";
   productForm?: ProductForm | "";
   location?: string;
-  status?: StockStatus | "";
+  /** `alert` = low + out (dashboard Stock Alerts) */
+  status?: StockStatus | "alert" | "";
 };
 
 export function getStockStatus(item: InventoryItem): StockStatus {
