@@ -34,6 +34,8 @@ In Railway → your service → **Variables**, add:
 | `ADMIN_PASSWORD` | strong password | Yes |
 | `ADMIN_SECRET` | long random string (32+ chars) | Yes |
 | `NODE_ENV` | `production` | Yes |
+| `PORT` | `3000` | **Yes** — must match Networking target port |
+| `HOSTNAME` | `0.0.0.0` | Recommended on Railway |
 | `DATA_PATH` | `/data` | Yes (with volume) |
 
 ## 4. Persistent volume (important)
