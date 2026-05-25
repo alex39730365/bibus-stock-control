@@ -11,7 +11,7 @@ git push -u origin master
 
 1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
 2. Select repository **`bibus-stock-control`** (search the full name — `bibus` alone may not match)
-3. Railway detects Next.js via `railway.toml` / Nixpacks
+3. Railway builds via **`Dockerfile`** (`railway.toml` → `builder = DOCKERFILE`)
 
 ### Repository not listed on Railway?
 
