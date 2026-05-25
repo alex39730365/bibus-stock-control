@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchMovements } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/format";
 import type { StockMovement } from "@/lib/types";
 import { RegionBadge } from "@/components/RegionFilter";
 import clsx from "clsx";
@@ -61,7 +62,7 @@ export default function MovementsPage() {
                 {movements.map((m) => (
                   <tr key={m.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(m.createdAt).toLocaleString()}
+                      {formatDateTime(m.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       <span

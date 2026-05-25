@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format";
 import type { InventoryStats } from "@/lib/types";
 import { Package, AlertTriangle, XCircle, Layers } from "lucide-react";
 
@@ -45,7 +46,7 @@ export function StatsCards({ stats }: { stats: InventoryStats }) {
           </div>
           <div>
             <p className="text-sm text-gray-500">{label}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="text-2xl font-bold text-gray-900">{formatNumber(value)}</p>
           </div>
         </div>
       ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Region } from "@/lib/types";
+import { formatNumber } from "@/lib/format";
 import { REGION_META, REGIONS } from "@/lib/regions";
 import clsx from "clsx";
 
@@ -65,7 +66,7 @@ export function RegionFilter({ value, onChange, counts, compact }: Props) {
                   active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
                 )}
               >
-                {count.toLocaleString()}
+                {formatNumber(count)}
               </span>
             )}
           </button>

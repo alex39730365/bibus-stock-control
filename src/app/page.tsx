@@ -10,6 +10,7 @@ import { getStockStatus } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import Link from "next/link";
 import { ArrowRight, Download } from "lucide-react";
+import { formatNumber } from "@/lib/format";
 import { REGION_META } from "@/lib/regions";
 
 const ALERTS_PAGE_SIZE = 10;
@@ -234,8 +235,8 @@ export default function DashboardPage() {
         {!alertsLoading && alertTotal > 0 && (
           <p className="mt-2 text-xs text-gray-500">
             {alertTotalPages > 1
-              ? `Page ${alertPage} of ${alertTotalPages} · ${alertTotal.toLocaleString()} alerts`
-              : `${alertTotal.toLocaleString()} alert${alertTotal === 1 ? "" : "s"}`}
+              ? `Page ${alertPage} of ${alertTotalPages} · ${formatNumber(alertTotal)} alerts`
+              : `${formatNumber(alertTotal)} alert${alertTotal === 1 ? "" : "s"}`}
           </p>
         )}
       </section>

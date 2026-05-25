@@ -5,6 +5,7 @@ import { getStockStatus } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
 import { RegionBadge } from "./RegionFilter";
 import { parseArticleCode } from "@/lib/article-code";
+import { formatNumber } from "@/lib/format";
 import { Pencil, Trash2, ArrowLeftRight } from "lucide-react";
 
 interface Props {
@@ -71,7 +72,7 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjust }: Props) {
                 </td>
                 <td className="px-4 py-3 text-gray-600">{item.dimensions}</td>
                 <td className="px-4 py-3 text-right font-medium">
-                  {item.quantity.toLocaleString()}{" "}
+                  {formatNumber(item.quantity)}{" "}
                   <span className="text-xs text-gray-400">{item.unit}</span>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{item.location}</td>

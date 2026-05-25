@@ -18,6 +18,7 @@ import {
   updateItem,
 } from "@/lib/api-client";
 import type { InventoryFilter, InventoryItem, Region } from "@/lib/types";
+import { formatNumber } from "@/lib/format";
 import { PRODUCT_FORMS } from "@/lib/types";
 import { REGION_META } from "@/lib/regions";
 import { Plus, Search, Download } from "lucide-react";
@@ -103,7 +104,7 @@ export default function InventoryPage() {
           <p className="mt-1 text-sm text-gray-500">
             {loading
               ? "Loading…"
-              : `${total.toLocaleString()} items · ${regionLabel}`}
+              : `${formatNumber(total)} items · ${regionLabel}`}
           </p>
         </div>
         <div className="flex gap-2">
