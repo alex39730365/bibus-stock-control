@@ -16,12 +16,26 @@ Your URL will be something like:
 
 1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** → **Create**  
 2. **Connect to Git** → `alex39730365/bibus-stock-control`  
-3. **Build settings:**
-   - Framework preset: **Next.js** (or Workers)
-   - Build command: `npx opennextjs-cloudflare build`
-   - Deploy command: `npx opennextjs-cloudflare deploy`  
-     (or use automatic Workers Builds if offered)
-4. **Environment variables** (Production):
+3. **Project type:** choose **Workers** (not “static site” only).  
+   This app has API routes + login — `Build output directory: /` will **not** work.
+
+4. **Build settings** (fill exactly):
+
+| Field | Value |
+|-------|--------|
+| Framework preset | **None** (or **Next.js** if listed) |
+| **Build command** | `npm install && npx opennextjs-cloudflare build` |
+| **Build output directory** | **leave empty** (do **not** use `/`) |
+| **Deploy command** (if shown) | `npx opennextjs-cloudflare deploy` |
+
+If there is only one command field, use:
+
+```bash
+npm install && npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy
+```
+
+`wrangler.jsonc` is already in the repo — Cloudflare will use it.
+5. **Environment variables** → **Variables and Secrets** (Production):
 
 | Variable | Value |
 |----------|--------|
@@ -32,7 +46,7 @@ Your URL will be something like:
 | `UPSTASH_REDIS_REST_TOKEN` | from Upstash |
 | `NODE_VERSION` | `20` |
 
-5. Deploy → open the `*.workers.dev` URL → `/login`
+6. Deploy → open the `*.workers.dev` URL → `/login`
 
 ## 3. Deploy from your PC (CLI)
 
