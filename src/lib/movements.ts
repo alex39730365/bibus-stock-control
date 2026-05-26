@@ -65,3 +65,45 @@ export async function recordMovement(params: {
 
   return { item: updated, movement };
 }
+
+function qtyMatches(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.0001;
+}
+
+export async function cancelMovement(
+  movementId: string,
+  operator: string
+): Promise<{ item: InventoryItem; movement: StockMovement }> {
+  const all = await readMovements();
+  const index = all.findIndex((m) => m.id === movementId);
+  if (index === -1) throw new Error("Movement not found");
+
+  const movement = all[index];
+  if (movement.cancelledAt) throw new Error("Movement already cancelled");
+
+  const item = await getItemById(movement.itemId);
+  if (!item) throw new Error("Item no longer exists");
+
+  if (!qtyMatches(item.quantity, movement.quantityAfter)) {
+    throw new Error(
+      "Current stock no longer matches this movement. Adjust stock manually or cancel newer movements first."
+    );
+  }
+
+  const restored: InventoryItem = {
+    ...item,
+    quantity: movement.quantityBefore,
+    updatedAt: new Date().toISOString(),
+  };
+  await upsertItem(restored);
+
+  const cancelled: StockMovement = {
+    ...movement,
+    cancelledAt: new Date().toISOString(),
+    cancelledBy: operator,
+  };
+  all[index] = cancelled;
+  await writeMovements(all);
+
+  return { item: restored, movement: cancelled };
+}

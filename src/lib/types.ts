@@ -79,6 +79,9 @@ export interface StockMovement {
   reason: string;
   operator: string;
   createdAt: string;
+  /** Set when this movement is reversed (stock restored to quantityBefore). */
+  cancelledAt?: string;
+  cancelledBy?: string;
 }
 
 export interface ApiResponse<T> {

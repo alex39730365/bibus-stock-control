@@ -7,6 +7,8 @@ import type {
   StockMovement,
 } from "./types";
 
+type MovementCancelResult = { item: InventoryItem; movement: StockMovement };
+
 const BASE = "/api";
 
 async function request<T>(
@@ -61,6 +63,14 @@ export async function fetchMovements(
   limit = 100
 ): Promise<ApiResponse<StockMovement[]>> {
   return request<StockMovement[]>(`/movements?limit=${limit}`);
+}
+
+export async function cancelMovement(
+  movementId: string
+): Promise<ApiResponse<MovementCancelResult>> {
+  return request<MovementCancelResult>(`/movements/${movementId}`, {
+    method: "DELETE",
+  });
 }
 
 export function getExportUrl(region?: InventoryFilter["region"]): string {
