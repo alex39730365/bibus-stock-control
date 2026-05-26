@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import path from "path";
-import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
@@ -14,4 +13,13 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-initOpenNextCloudflareForDev();
+/** Cloudflare local dev only — must not load on Vercel (breaks `next build`). */
+if (process.env.NODE_ENV === "development" && !process.env.VERCEL) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { initOpenNextCloudflareForDev } = require("@opennextjs/cloudflare");
+    initOpenNextCloudflareForDev();
+  } catch {
+    /* optional: install devDependencies for Cloudflare preview */
+  }
+}
