@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { InventoryItem, ProductForm, Region } from "@/lib/types";
 import { PRODUCT_FORMS, defaultUnitForForm } from "@/lib/types";
 import { REGIONS, REGION_META } from "@/lib/regions";
+import { SelectedItemsList } from "./SelectedItemsList";
 import { X } from "lucide-react";
 
 const empty: Omit<InventoryItem, "id" | "updatedAt"> = {
@@ -127,6 +128,11 @@ export function ItemFormModal({ item, open, onClose, onSave }: Props) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4 p-5">
+          {item && (
+            <div className="col-span-2">
+              <SelectedItemsList items={[item]} />
+            </div>
+          )}
           {field("Region", "region")}
           <div className="col-span-2">{field("Article No. *", "articleNo")}</div>
           {field("Material", "material")}

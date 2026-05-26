@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useEffect, type Dispatch, type SetStateAction } from "react";
 import type { InventoryItem } from "@/lib/types";
 import { getStockStatus } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
@@ -10,12 +11,56 @@ import { Pencil, Trash2, ArrowLeftRight } from "lucide-react";
 
 interface Props {
   items: InventoryItem[];
+  selectedItems: Map<string, InventoryItem>;
+  onSelectedItemsChange: Dispatch<SetStateAction<Map<string, InventoryItem>>>;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onAdjust: (item: InventoryItem) => void;
 }
 
-export function InventoryTable({ items, onEdit, onDelete, onAdjust }: Props) {
+export function InventoryTable({
+  items,
+  selectedItems,
+  onSelectedItemsChange,
+  onEdit,
+  onDelete,
+  onAdjust,
+}: Props) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const pageIds = items.map((i) => i.id);
+  const selectedOnPage = pageIds.filter((id) => selectedItems.has(id)).length;
+  const allOnPageSelected =
+    items.length > 0 && selectedOnPage === items.length;
+  const someOnPageSelected =
+    selectedOnPage > 0 && selectedOnPage < items.length;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someOnPageSelected;
+    }
+  }, [someOnPageSelected]);
+
+  const toggleOne = (item: InventoryItem, checked: boolean) => {
+    onSelectedItemsChange((prev) => {
+      const next = new Map(prev);
+      if (checked) next.set(item.id, item);
+      else next.delete(item.id);
+      return next;
+    });
+  };
+
+  const toggleAllOnPage = () => {
+    onSelectedItemsChange((prev) => {
+      const next = new Map(prev);
+      if (allOnPageSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        items.forEach((item) => next.set(item.id, item));
+      }
+      return next;
+    });
+  };
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">
@@ -30,6 +75,16 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjust }: Props) {
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
+              <th className="w-10 px-3 py-3">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={toggleAllOnPage}
+                  className="h-4 w-4 rounded border-gray-300 text-[#396bea] focus:ring-[#396bea]"
+                  aria-label="Select all on this page"
+                />
+              </th>
               <th className="px-4 py-3">Region</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Article No.</th>
@@ -42,8 +97,22 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjust }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {items.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50">
+            {items.map((item) => {
+              const checked = selectedItems.has(item.id);
+              return (
+              <tr
+                key={item.id}
+                className={checked ? "bg-blue-50/60 hover:bg-blue-50" : "hover:bg-gray-50"}
+              >
+                <td className="w-10 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => toggleOne(item, e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-[#396bea] focus:ring-[#396bea]"
+                    aria-label={`Select ${item.articleNo}`}
+                  />
+                </td>
                 <td className="px-4 py-3">
                   <RegionBadge region={item.region} />
                 </td>
@@ -102,7 +171,8 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjust }: Props) {
                   </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

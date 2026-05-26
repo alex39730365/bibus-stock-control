@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { InventoryTable } from "@/components/InventoryTable";
 import { ItemFormModal } from "@/components/ItemFormModal";
 import { StockAdjustModal } from "@/components/StockAdjustModal";
+import { BulkItemEditModal } from "@/components/BulkItemEditModal";
 import { Pagination } from "@/components/Pagination";
 import {
   RegionFilter,
@@ -21,7 +22,7 @@ import type { InventoryFilter, InventoryItem, Region } from "@/lib/types";
 import { formatNumber } from "@/lib/format";
 import { PRODUCT_FORMS } from "@/lib/types";
 import { REGION_META } from "@/lib/regions";
-import { Plus, Search, Download } from "lucide-react";
+import { Plus, Search, Download, ArrowLeftRight, Pencil, Trash2 } from "lucide-react";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -35,16 +36,36 @@ export default function InventoryPage() {
   );
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
+  const [adjustItems, setAdjustItems] = useState<InventoryItem[]>([]);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Map<string, InventoryItem>>(
+    () => new Map()
+  );
 
   useEffect(() => {
     const t = setTimeout(() => {
       setFilter((f) => ({ ...f, search: searchInput }));
       setPage(1);
+      setSelectedItems(new Map());
     }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  useEffect(() => {
+    setSelectedItems((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Map(prev);
+      for (const item of items) {
+        if (next.has(item.id)) {
+          next.set(item.id, item);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [items]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +91,58 @@ export default function InventoryPage() {
   const setRegion = (region: RegionFilterValue) => {
     setFilter((f) => ({ ...f, region }));
     setPage(1);
+    setSelectedItems(new Map());
+  };
+
+  const clearSelection = () => setSelectedItems(new Map());
+
+  const selectedList = Array.from(selectedItems.values());
+
+  const openStockAdjust = (item?: InventoryItem) => {
+    if (selectedItems.size > 0) {
+      setAdjustItems(Array.from(selectedItems.values()));
+    } else if (item) {
+      setAdjustItems([item]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const n = selectedItems.size;
+    if (
+      !confirm(
+        `Delete ${formatNumber(n)} stock item${n === 1 ? "" : "s"} permanently?`
+      )
+    ) {
+      return;
+    }
+    for (const id of selectedItems.keys()) {
+      await deleteItem(id);
+    }
+    clearSelection();
+    await load();
+  };
+
+  const openEdit = (item?: InventoryItem) => {
+    const selected = Array.from(selectedItems.values());
+    if (selectedItems.size > 1) {
+      setBulkEditOpen(true);
+    } else if (selectedItems.size === 1) {
+      setEditItem(selected[0]);
+      setModalOpen(true);
+    } else if (item) {
+      setEditItem(item);
+      setModalOpen(true);
+    }
+  };
+
+  const handleBulkSave = async (
+    patch: Partial<Omit<InventoryItem, "id" | "updatedAt">>
+  ) => {
+    for (const item of selectedList) {
+      await updateItem(item.id, patch);
+    }
+    clearSelection();
+    await load();
   };
 
   const handleSave = async (
@@ -157,6 +230,7 @@ export default function InventoryPage() {
               productForm: e.target.value as InventoryFilter["productForm"],
             });
             setPage(1);
+            setSelectedItems(new Map());
           }}
           className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
         >
@@ -175,6 +249,7 @@ export default function InventoryPage() {
               status: e.target.value as InventoryFilter["status"],
             });
             setPage(1);
+            setSelectedItems(new Map());
           }}
           className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
         >
@@ -185,14 +260,58 @@ export default function InventoryPage() {
         </select>
       </div>
 
+      {selectedItems.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#396bea]/30 bg-[#396bea]/5 px-4 py-2 text-sm">
+          <span className="font-medium text-[#396bea]">
+            {formatNumber(selectedItems.size)} selected
+          </span>
+          <div className="flex items-center gap-1 border-l border-[#396bea]/20 pl-3">
+            <button
+              type="button"
+              onClick={() => openStockAdjust()}
+              className="rounded p-1.5 text-gray-600 hover:bg-green-50 hover:text-green-700"
+              title={`Stock in / out (${selectedItems.size})`}
+            >
+              <ArrowLeftRight size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => openEdit()}
+              className="rounded p-1.5 text-gray-600 hover:bg-gray-100 hover:text-[#396bea]"
+              title={
+                selectedList.length === 1
+                  ? "Edit item"
+                  : `Bulk edit (${selectedItems.size})`
+              }
+            >
+              <Pencil size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              className="rounded p-1.5 text-gray-600 hover:bg-red-50 hover:text-red-600"
+              title={`Delete (${selectedItems.size})`}
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="ml-auto text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <InventoryTable
         items={items}
-        onEdit={(item) => {
-          setEditItem(item);
-          setModalOpen(true);
-        }}
+        selectedItems={selectedItems}
+        onSelectedItemsChange={setSelectedItems}
+        onEdit={(item) => openEdit(item)}
         onDelete={handleDelete}
-        onAdjust={(item) => setAdjustItem(item)}
+        onAdjust={(item) => openStockAdjust(item)}
       />
 
       {!loading && totalPages > 1 && (
@@ -217,10 +336,20 @@ export default function InventoryPage() {
       />
 
       <StockAdjustModal
-        open={!!adjustItem}
-        item={adjustItem}
-        onClose={() => setAdjustItem(null)}
-        onSuccess={load}
+        open={adjustItems.length > 0}
+        items={adjustItems}
+        onClose={() => setAdjustItems([])}
+        onSuccess={() => {
+          if (adjustItems.length > 1) clearSelection();
+          load();
+        }}
+      />
+
+      <BulkItemEditModal
+        open={bulkEditOpen}
+        items={Array.from(selectedItems.values())}
+        onClose={() => setBulkEditOpen(false)}
+        onSave={handleBulkSave}
       />
     </div>
   );
