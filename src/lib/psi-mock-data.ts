@@ -58,8 +58,9 @@ function buildPsiMonthColumns(): PsiTimelineMonth[] {
 
 export const PSI_MONTH_COLUMNS = buildPsiMonthColumns();
 
+/** Display label for a timeline month (name only, no year). */
 export function formatPsiMonthLabel(monthIndex: number): string {
-  return PSI_MONTH_COLUMNS[monthIndex]?.label ?? PSI_MONTHS[monthIndex] ?? "";
+  return PSI_MONTHS[monthIndex] ?? "";
 }
 
 export const MOS_RISK_THRESHOLD = 3.0;
@@ -147,13 +148,53 @@ export function formatPortfolioAvgMos(
   };
 }
 
-/** Current month index for KPI focus (May = index 1 in this mock). */
-export const PSI_CURRENT_MONTH_INDEX = 1;
+/**
+ * Index into `PSI_MONTHS` / `PSI_MONTH_COLUMNS` for today's calendar month.
+ * Clamps to timeline bounds when the date is before Apr '26 or after May '27.
+ */
+export function getPsiCurrentMonthIndex(at: Date = new Date()): number {
+  const calMonth = at.getMonth();
+  const year = at.getFullYear();
+
+  const exact = PSI_MONTH_COLUMNS.findIndex(
+    (col) =>
+      col.year === year && (CALENDAR_MONTH_INDEX[col.month] ?? -1) === calMonth
+  );
+  if (exact >= 0) return exact;
+
+  const first = PSI_MONTH_COLUMNS[0]!;
+  const firstStart = new Date(
+    first.year,
+    CALENDAR_MONTH_INDEX[first.month] ?? 0,
+    1
+  );
+  if (at < firstStart) return 0;
+
+  const last = PSI_MONTH_COLUMNS[PSI_MONTH_COLUMNS.length - 1]!;
+  const lastStart = new Date(
+    last.year,
+    CALENDAR_MONTH_INDEX[last.month] ?? 0,
+    1
+  );
+  if (at >= lastStart) return PSI_MONTH_COLUMNS.length - 1;
+
+  for (let i = PSI_MONTH_COLUMNS.length - 1; i >= 0; i--) {
+    const col = PSI_MONTH_COLUMNS[i]!;
+    const start = new Date(
+      col.year,
+      CALENDAR_MONTH_INDEX[col.month] ?? 0,
+      1
+    );
+    if (at >= start) return i;
+  }
+
+  return 0;
+}
 
 /** True when ending inventory goes negative from `fromMonthIndex` onward. */
 export function hasFutureEndingShortage(
   endingInventory: number[],
-  fromMonthIndex: number = PSI_CURRENT_MONTH_INDEX
+  fromMonthIndex: number = getPsiCurrentMonthIndex()
 ): boolean {
   return endingInventory.slice(fromMonthIndex).some((v) => v < 0);
 }
@@ -453,7 +494,7 @@ export function buildPsiItems(
 export const PSI_MOCK_ITEMS = buildPsiItems();
 
 export function computePsiKpis(items: PsiItem[]): PsiKpiSummary {
-  const mi = PSI_CURRENT_MONTH_INDEX;
+  const mi = getPsiCurrentMonthIndex();
   let totalDemand = 0;
   let totalScheduleReceipts = 0;
   let totalEnding = 0;

@@ -13,7 +13,8 @@
     "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "lint": "next lint",
-    "import:centralization": "node scripts/import-centralization.mjs"
+    "import:centralization": "node scripts/import-centralization.mjs",
+    "verify:psi": "node scripts/verify-psi.mjs"
   },
   "dependencies": {
     "next": "^15.3.3",

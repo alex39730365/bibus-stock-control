@@ -15,7 +15,7 @@ import { formatNumber } from "@/lib/format";
 import {
   MOS_DANGER_THRESHOLD,
   MOS_RISK_THRESHOLD,
-  PSI_CURRENT_MONTH_INDEX,
+  getPsiCurrentMonthIndex,
   PSI_MOCK_SOURCES,
   PSI_MONTHS,
   buildPsiItems,
@@ -125,14 +125,20 @@ function DataCell({
   );
 }
 
-function PsiKpiCards({ items }: { items: PsiItem[] }) {
+function PsiKpiCards({
+  items,
+  currentMonthIndex,
+}: {
+  items: PsiItem[];
+  currentMonthIndex: number;
+}) {
   const kpi = useMemo(() => computePsiKpis(items), [items]);
   const avgMosKpi = formatPortfolioAvgMos(kpi.avgMonthsOfSupply);
 
   const cards = [
     {
       label: "Total Demand",
-      sub: `${formatPsiMonthLabel(PSI_CURRENT_MONTH_INDEX)} · roll-up`,
+      sub: `${formatPsiMonthLabel(currentMonthIndex)} · roll-up`,
       value: formatNumber(kpi.totalDemand),
       unit: "kg",
       icon: TrendingUp,
@@ -252,11 +258,13 @@ function MonthColumns({
   unit,
   values,
   className,
+  currentMonthIndex,
 }: {
   metric: PsiMetricLine | "Total Demand";
   unit: string;
   values: readonly (number | null)[];
   className?: string;
+  currentMonthIndex: number;
 }) {
   return (
     <>
@@ -264,6 +272,7 @@ function MonthColumns({
         <MonthValueCell
           key={`${month}-${monthIndex}`}
           monthIndex={monthIndex}
+          currentMonthIndex={currentMonthIndex}
           metric={metric}
           value={valueAtMonthIndex(values, monthIndex)}
           unit={unit}
@@ -279,15 +288,17 @@ function MonthValueCell({
   value,
   unit,
   monthIndex,
+  currentMonthIndex,
   className,
 }: {
   metric: PsiMetricLine | "Total Demand";
   value: number | null;
   unit: string;
   monthIndex: number;
+  currentMonthIndex: number;
   className?: string;
 }) {
-  const isCurrentMonth = monthIndex === PSI_CURRENT_MONTH_INDEX;
+  const isCurrentMonth = monthIndex === currentMonthIndex;
   const isMos = metric === "Months of Supply" && value !== null;
   const numeric = value ?? 0;
   const display =
@@ -333,7 +344,13 @@ function MonthValueCell({
   );
 }
 
-function ItemBlock({ item }: { item: PsiItem }) {
+function ItemBlock({
+  item,
+  currentMonthIndex,
+}: {
+  item: PsiItem;
+  currentMonthIndex: number;
+}) {
   const [open, setOpen] = useState(item.itemCode === "I/C 905310");
 
   const totalMetrics = useMemo(
@@ -378,10 +395,10 @@ function ItemBlock({ item }: { item: PsiItem }) {
               >
                 {item.spec}
               </span>
-              <EndingInventorySparkline
-                values={item.totals.endingInventory}
-                fromMonthIndex={PSI_CURRENT_MONTH_INDEX}
-              />
+            <EndingInventorySparkline
+              values={item.totals.endingInventory}
+              fromMonthIndex={currentMonthIndex}
+            />
             </div>
             <button
               type="button"
@@ -403,6 +420,7 @@ function ItemBlock({ item }: { item: PsiItem }) {
             actual={c.actual}
             shortage={c.shortage}
             unit={item.unit}
+            currentMonthIndex={currentMonthIndex}
           />
         ))}
 
@@ -461,6 +479,7 @@ function ItemBlock({ item }: { item: PsiItem }) {
                 metric={metric}
                 unit={item.unit}
                 values={values}
+                currentMonthIndex={currentMonthIndex}
                 className={clsx(TOTAL_ROW_BG, totalCellBorder)}
               />
             </tr>
@@ -476,12 +495,14 @@ function CustomerMetricRows({
   actual,
   shortage,
   unit,
+  currentMonthIndex,
 }: {
   cust: string;
   forecast: number[];
   actual: (number | null)[];
   shortage: number[];
   unit: string;
+  currentMonthIndex: number;
 }) {
   const rows: { metric: PsiMetricLine; values: (number | null)[] }[] = [
     { metric: "Forecast", values: forecast },
@@ -532,6 +553,7 @@ function CustomerMetricRows({
               metric={metric}
               unit={unit}
               values={values}
+              currentMonthIndex={currentMonthIndex}
               className={clsx(cellBorder, "bg-white")}
             />
           </tr>
@@ -541,7 +563,13 @@ function CustomerMetricRows({
   );
 }
 
-function PsiTimelineTable({ items }: { items: PsiItem[] }) {
+function PsiTimelineTable({
+  items,
+  currentMonthIndex,
+}: {
+  items: PsiItem[];
+  currentMonthIndex: number;
+}) {
   return (
     <div className="w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 bg-white px-4 py-3">
@@ -607,7 +635,7 @@ function PsiTimelineTable({ items }: { items: PsiItem[] }) {
                 </div>
               </th>
               {PSI_MONTHS.map((month, i) => {
-                const isCurrent = i === PSI_CURRENT_MONTH_INDEX;
+                const isCurrent = i === currentMonthIndex;
                 return (
                   <th
                     key={`${month}-${i}`}
@@ -639,7 +667,11 @@ function PsiTimelineTable({ items }: { items: PsiItem[] }) {
           </thead>
           <tbody className="bg-white">
             {items.map((item) => (
-              <ItemBlock key={item.itemCode} item={item} />
+              <ItemBlock
+                key={item.itemCode}
+                item={item}
+                currentMonthIndex={currentMonthIndex}
+              />
             ))}
           </tbody>
         </table>
@@ -650,11 +682,12 @@ function PsiTimelineTable({ items }: { items: PsiItem[] }) {
 
 export function PsiDashboard() {
   const items = useMemo(() => buildPsiItems(PSI_MOCK_SOURCES), []);
+  const currentMonthIndex = useMemo(() => getPsiCurrentMonthIndex(), []);
 
   return (
     <div className="space-y-6">
-      <PsiKpiCards items={items} />
-      <PsiTimelineTable items={items} />
+      <PsiKpiCards items={items} currentMonthIndex={currentMonthIndex} />
+      <PsiTimelineTable items={items} currentMonthIndex={currentMonthIndex} />
       <p className="text-xs text-slate-400">
         Mock data · MoS danger &lt; {MOS_DANGER_THRESHOLD} mo · target ≥
         {MOS_RISK_THRESHOLD} mo
