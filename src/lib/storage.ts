@@ -86,7 +86,7 @@ export async function bulkUpsert(
 export function computeStats(items: InventoryItem[]): InventoryStats {
   const byForm: Record<string, number> = {};
   const byLocation: Record<string, number> = {};
-  const byRegion: Record<Region, number> = { BMAG: 0, BMCN: 0 };
+  const byRegion: Record<Region, number> = { BMAG: 0, BMCN: 0, BMKR: 0 };
   let lowStockCount = 0;
   let outOfStockCount = 0;
   let totalQuantity = 0;

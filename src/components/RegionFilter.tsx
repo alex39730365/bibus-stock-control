@@ -84,7 +84,9 @@ export function RegionBadge({ region }: { region: Region }) {
         "inline-flex flex-col rounded-md px-2 py-0.5 text-xs font-medium leading-tight",
         region === "BMAG"
           ? "bg-blue-50 text-[#396bea]"
-          : "bg-red-50 text-red-700"
+          : region === "BMCN"
+            ? "bg-red-50 text-red-700"
+            : "bg-amber-50 text-amber-900"
       )}
     >
       <span>{meta.label}</span>

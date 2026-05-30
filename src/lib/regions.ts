@@ -5,7 +5,7 @@ import {
   parseArticleCode,
 } from "./article-code";
 
-export const REGIONS: Region[] = ["BMAG", "BMCN"];
+export const REGIONS: Region[] = ["BMAG", "BMCN", "BMKR"];
 
 export const REGION_META: Record<
   Region,
@@ -21,13 +21,23 @@ export const REGION_META: Record<
     country: "China",
     description: "BIBUS CN — China inventory",
   },
+  BMKR: {
+    label: "BMKR",
+    country: "Korea",
+    description: "BIBUS Korea — ordering & branch demand",
+  },
 };
 
 /** Infer region from legacy notes/location when field is missing */
 export function resolveRegion(item: Partial<InventoryItem>): Region {
-  if (item.region === "BMAG" || item.region === "BMCN") return item.region;
+  if (item.region === "BMAG" || item.region === "BMCN" || item.region === "BMKR") {
+    return item.region;
+  }
   const notes = String(item.notes ?? "");
   if (notes.includes("Source: BMCN") || item.location === "BMCN") return "BMCN";
+  if (notes.includes("Source: BMKR") || notes.includes("BMKR Ordering")) {
+    return "BMKR";
+  }
   if (notes.includes("Source: BMAG")) return "BMAG";
   return "BMAG";
 }

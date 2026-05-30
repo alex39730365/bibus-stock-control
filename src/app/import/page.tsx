@@ -10,7 +10,8 @@ export default function ImportPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Data Import</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Administrator bulk upload — centralization Excel (BMAG / BMCN sheets)
+          Bulk upload — centralization (BMAG/BMCN), BMKR Ordering Status, or
+          standard Excel template
         </p>
       </header>
 
