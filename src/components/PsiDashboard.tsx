@@ -32,36 +32,59 @@ import {
 const STICKY_Z = { head: "z-40", row: "z-30", body: "z-20" } as const;
 
 const MONTH_COUNT = PSI_MONTHS.length;
-/** Cust + Metric + month columns */
-const TABLE_COL_COUNT = 2 + MONTH_COUNT;
+const STICKY_COL_COUNT = 2;
+/** Sticky cols fixed (px); month cols share remaining width when table is w-full. */
+const CUST_COL_PX = 64;
+const METRIC_COL_PX = 110;
+const MONTH_COL_MIN_PX = 52;
+const STICKY_BLOCK_PX = CUST_COL_PX + METRIC_COL_PX;
+const TABLE_MIN_WIDTH_PX = STICKY_BLOCK_PX + MONTH_COUNT * MONTH_COL_MIN_PX;
+/** Even split of leftover table width — keeps APR…MAY grid aligned under w-full. */
+const MONTH_COL_WIDTH = `calc((100% - ${STICKY_BLOCK_PX}px) / ${MONTH_COUNT})`;
+
+/** CUST + METRIC + PSI_MONTHS — must match <colgroup> column count. */
+function getTableColSpan(): number {
+  return STICKY_COL_COUNT + PSI_MONTHS.length;
+}
 
 const ITEM_HEADER_H = "h-10 max-h-10";
 const DATA_ROW = "h-8 max-h-8";
 const HEAD_H = "h-10 max-h-10";
 
-/** Sticky left: Cust 64px + Metric 110px */
-const COL_CUST =
-  "sticky left-0 w-16 min-w-16 max-w-16 border-r border-slate-200";
-const COL_METRIC =
-  "sticky left-16 w-[110px] min-w-[110px] max-w-[110px] border-r border-slate-200 shadow-[4px_0_8px_-2px_rgba(15,23,42,0.06)]";
-
-const MONTH_COL_W = "w-[3.25rem] min-w-[3.25rem] max-w-[3.25rem]";
+/** Width from <col> only — no w-* on cells (prevents thead/tbody drift). */
+const COL_CUST = "sticky left-0 box-border border-r border-slate-200 bg-inherit";
+const COL_METRIC = "sticky left-[64px] box-border border-r border-slate-200 bg-inherit";
+const MONTH_CELL =
+  "box-border overflow-hidden border-r border-slate-100 p-0 align-middle";
 
 const cellBase = "whitespace-nowrap p-0 align-middle leading-none";
-const innerData = "flex h-8 max-h-8 items-center px-2 py-1";
-const innerHead = "flex h-10 max-h-10 items-center px-2 py-2";
+const innerData = "flex h-8 max-h-8 w-full items-center px-2 py-1";
+const innerHead = "flex h-10 max-h-10 w-full items-center px-2 py-2";
+const innerMonthHead =
+  "flex h-10 max-h-10 w-full items-center justify-center px-1";
+const innerMonthData =
+  "flex h-8 max-h-8 w-full items-center justify-center px-1 tabular-nums";
+
+/** Total summary: merged CUST+METRIC (colSpan 2). */
+const TOTAL_LABEL_COL = clsx(
+  cellBase,
+  DATA_ROW,
+  "sticky left-0 z-20 box-border border-r border-slate-200 bg-inherit"
+);
 
 const METRICS_PER_CUST = 3;
 
-/** Borders inside a customer bundle vs between customers. */
-function customerRowBorder(metric: PsiMetricLine): string {
-  if (metric === "Shortage") {
-    return "border-b border-slate-200";
-  }
-  if (metric === "Actual") {
-    return "border-b border-slate-50";
-  }
-  return "";
+/** Subtle fill for roll-up rows (distinct from buyer detail rows). */
+const TOTAL_ROW_BG = "bg-slate-50";
+
+/** Buyer group end — must match on rowSpan CUST + every Shortage data cell. */
+const CUST_GROUP_END_BORDER = "border-b border-solid border-slate-300";
+/** Forecast / Actual interior dividers (data cells only). */
+const CUST_INNER_ROW_BORDER = "border-b border-solid border-slate-100";
+
+/** Per-cell bottom border for buyer metric rows (never on `<tr>` — rowSpan eats tr borders). */
+function customerDataCellBorder(metric: PsiMetricLine): string {
+  return metric === "Shortage" ? CUST_GROUP_END_BORDER : CUST_INNER_ROW_BORDER;
 }
 
 const MOS_DOT: Record<MosTier, string> = {
@@ -199,7 +222,7 @@ function MosDotValue({ value }: { value: number }) {
   const label = formatPsiValue("Months of Supply", value, "months");
 
   return (
-    <span className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap">
+    <span className="inline-flex w-full flex-row items-center justify-center gap-1.5 whitespace-nowrap">
       <span
         className={clsx("h-1.5 w-1.5 shrink-0 rounded-full", MOS_DOT[tier])}
         aria-hidden
@@ -211,17 +234,60 @@ function MosDotValue({ value }: { value: number }) {
   );
 }
 
+/** Read series at month index; always returns a slot (never skip columns). */
+function valueAtMonthIndex(
+  values: readonly (number | null)[],
+  monthIndex: number
+): number | null {
+  if (monthIndex < 0 || monthIndex >= MONTH_COUNT) return null;
+  const v = values[monthIndex];
+  if (v === undefined || v === null) return null;
+  if (typeof v === "number" && !Number.isFinite(v)) return null;
+  return v;
+}
+
+/** One `<td>` per `PSI_MONTHS` entry — same order as `<thead>`. */
+function MonthColumns({
+  metric,
+  unit,
+  values,
+  className,
+}: {
+  metric: PsiMetricLine | "Total Demand";
+  unit: string;
+  values: readonly (number | null)[];
+  className?: string;
+}) {
+  return (
+    <>
+      {PSI_MONTHS.map((month, monthIndex) => (
+        <MonthValueCell
+          key={`${month}-${monthIndex}`}
+          monthIndex={monthIndex}
+          metric={metric}
+          value={valueAtMonthIndex(values, monthIndex)}
+          unit={unit}
+          className={className}
+        />
+      ))}
+    </>
+  );
+}
+
 function MonthValueCell({
   metric,
   value,
   unit,
+  monthIndex,
   className,
 }: {
   metric: PsiMetricLine | "Total Demand";
   value: number | null;
   unit: string;
+  monthIndex: number;
   className?: string;
 }) {
+  const isCurrentMonth = monthIndex === PSI_CURRENT_MONTH_INDEX;
   const isMos = metric === "Months of Supply" && value !== null;
   const numeric = value ?? 0;
   const display =
@@ -234,26 +300,36 @@ function MonthValueCell({
   const isNegativeShortage = metric === "Shortage" && numeric < 0;
   const isNegativeEnding = metric === "Ending Inventory" && numeric < 0;
 
+  const isLastMonth = monthIndex === MONTH_COUNT - 1;
+
   return (
-    <DataCell
-      align={isMos ? "center" : "right"}
-      className={clsx("border-slate-100", className)}
-    >
-      {isMos ? (
-        <MosDotValue value={numeric} />
-      ) : (
-        <span
-          className={clsx(
-            "text-xs tabular-nums leading-none",
-            isNegativeShortage && "font-medium text-red-600",
-            isNegativeEnding && "font-medium text-red-600",
-            !isNegativeShortage && !isNegativeEnding && "text-slate-700"
-          )}
-        >
-          {display}
-        </span>
+    <td
+      className={clsx(
+        cellBase,
+        DATA_ROW,
+        MONTH_CELL,
+        isLastMonth && "border-r-0",
+        isCurrentMonth && "bg-blue-50",
+        className
       )}
-    </DataCell>
+    >
+      <div className={innerMonthData}>
+        {isMos ? (
+          <MosDotValue value={numeric} />
+        ) : (
+          <span
+            className={clsx(
+              "text-xs leading-none",
+              isNegativeShortage && "font-medium text-red-600",
+              isNegativeEnding && "font-medium text-red-600",
+              !isNegativeShortage && !isNegativeEnding && "text-slate-700"
+            )}
+          >
+            {display}
+          </span>
+        )}
+      </div>
+    </td>
   );
 }
 
@@ -273,39 +349,44 @@ function ItemBlock({ item }: { item: PsiItem }) {
 
   return (
     <>
-      {/* Item group header — full width, no rowSpan */}
-      <tr className={clsx(ITEM_HEADER_H, "border-t border-slate-200 bg-slate-50")}>
-        <td colSpan={TABLE_COL_COUNT} className="p-0 align-middle">
-          <div className="flex h-10 items-center gap-2 whitespace-nowrap px-3 py-1">
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              className="flex shrink-0 items-center gap-1.5 rounded-md py-0.5 text-left hover:bg-slate-100"
-              aria-expanded={open}
-            >
-              {open ? (
-                <ChevronDown size={14} className="text-slate-500" />
-              ) : (
-                <ChevronRight size={14} className="text-slate-500" />
-              )}
-              <span className="font-mono text-xs font-semibold text-[#396bea]">
-                {item.itemCode}
+      {/* Item group header — spans every column (CUST + METRIC + all months) */}
+      <tr className={clsx(ITEM_HEADER_H, "border-t border-slate-200 bg-slate-50/75")}>
+        <td
+          colSpan={getTableColSpan()}
+          className="w-full bg-slate-50/75 p-0 align-middle"
+        >
+          <div className="flex h-10 w-full min-w-full items-center justify-between gap-3 whitespace-nowrap px-4 py-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="flex shrink-0 items-center gap-1.5 rounded-md py-0.5 text-left hover:bg-slate-100"
+                aria-expanded={open}
+              >
+                {open ? (
+                  <ChevronDown size={14} className="text-slate-500" />
+                ) : (
+                  <ChevronRight size={14} className="text-slate-500" />
+                )}
+                <span className="font-mono text-xs font-semibold text-[#396bea]">
+                  {item.itemCode}
+                </span>
+              </button>
+              <span
+                className="hidden min-w-0 truncate text-xs text-slate-500 sm:inline"
+                title={item.spec}
+              >
+                {item.spec}
               </span>
-            </button>
-            <span
-              className="hidden min-w-0 truncate text-xs text-slate-500 sm:inline"
-              title={item.spec}
-            >
-              {item.spec}
-            </span>
-            <EndingInventorySparkline
-              values={item.totals.endingInventory}
-              fromMonthIndex={PSI_CURRENT_MONTH_INDEX}
-            />
+              <EndingInventorySparkline
+                values={item.totals.endingInventory}
+                fromMonthIndex={PSI_CURRENT_MONTH_INDEX}
+              />
+            </div>
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="ml-auto shrink-0 text-xs text-slate-400 hover:text-slate-600"
+              className="shrink-0 text-xs text-slate-400 hover:text-slate-600"
             >
               {open ? "Collapse" : "Expand"}
             </button>
@@ -326,45 +407,65 @@ function ItemBlock({ item }: { item: PsiItem }) {
         ))}
 
       {open &&
-        totalMetrics.map(({ metric, values }, totalIdx) => (
-          <tr
-            key={`${item.itemCode}-${metric}`}
-            className={clsx(
-              DATA_ROW,
-              "bg-blue-50/50",
-              totalIdx === 0 && "border-t border-slate-200"
-            )}
-          >
-            <DataCell
-              className={clsx(COL_CUST, STICKY_Z.body, "bg-blue-50")}
-              align="center"
+        totalMetrics.map(({ metric, values }, totalIdx) => {
+          const isFirstTotal = totalIdx === 0;
+          const isLastTotal = totalIdx === totalMetrics.length - 1;
+          const totalCellBorder = clsx(
+            isFirstTotal && "border-t border-solid border-slate-200",
+            isLastTotal && "border-b border-solid border-slate-200"
+          );
+
+          return (
+            <tr
+              key={`${item.itemCode}-${metric}`}
+              className={clsx(DATA_ROW, TOTAL_ROW_BG)}
             >
-              {totalIdx === 0 ? (
-                <span className="text-[10px] font-semibold uppercase leading-none text-slate-500">
-                  Total
-                </span>
-              ) : null}
-            </DataCell>
-            <DataCell
-              className={clsx(COL_METRIC, STICKY_Z.body, "bg-blue-50")}
-            >
-              <span
-                className="truncate text-xs font-semibold leading-none text-[#396bea]"
-                title={metric}
+              {/* CUST + METRIC — colSpan 2 matches sticky pair width; frees month grid alignment */}
+              <td
+                colSpan={STICKY_COL_COUNT}
+                className={clsx(
+                  TOTAL_LABEL_COL,
+                  TOTAL_ROW_BG,
+                  totalCellBorder,
+                  "align-middle"
+                )}
               >
-                {metric}
-              </span>
-            </DataCell>
-            {values.map((v, i) => (
-              <MonthValueCell
-                key={`${metric}-${i}`}
+                <div
+                  className="flex h-8 w-full items-center gap-0"
+                  style={{ width: STICKY_BLOCK_PX, minWidth: STICKY_BLOCK_PX }}
+                >
+                  <div
+                    className="flex shrink-0 items-center justify-center px-1"
+                    style={{ width: CUST_COL_PX }}
+                  >
+                    {isFirstTotal ? (
+                      <span className="text-[10px] font-semibold uppercase leading-none text-slate-500">
+                        Total
+                      </span>
+                    ) : null}
+                  </div>
+                  <div
+                    className="flex min-w-0 items-center px-2"
+                    style={{ width: METRIC_COL_PX }}
+                  >
+                    <span
+                      className="truncate text-xs font-semibold leading-none text-[#396bea]"
+                      title={metric}
+                    >
+                      {metric}
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <MonthColumns
                 metric={metric}
-                value={v}
                 unit={item.unit}
+                values={values}
+                className={clsx(TOTAL_ROW_BG, totalCellBorder)}
               />
-            ))}
-          </tr>
-        ))}
+            </tr>
+          );
+        })}
     </>
   );
 }
@@ -392,12 +493,12 @@ function CustomerMetricRows({
     <>
       {rows.map(({ metric, values }) => {
         const isForecast = metric === "Forecast";
-        const rowBorder = customerRowBorder(metric);
+        const cellBorder = customerDataCellBorder(metric);
 
         return (
           <tr
             key={`${cust}-${metric}`}
-            className={clsx(DATA_ROW, rowBorder, "hover:bg-slate-50/80")}
+            className={clsx(DATA_ROW, "hover:bg-slate-50/80")}
           >
             {isForecast && (
               <td
@@ -406,10 +507,11 @@ function CustomerMetricRows({
                   cellBase,
                   COL_CUST,
                   STICKY_Z.body,
-                  "border-b border-slate-200 bg-white align-middle"
+                  CUST_GROUP_END_BORDER,
+                  "bg-white align-middle"
                 )}
               >
-                <div className="flex items-center justify-center px-2 py-1">
+                <div className={clsx(innerData, "justify-center")}>
                   <span className="text-xs font-semibold leading-none text-slate-700">
                     {cust}
                   </span>
@@ -417,19 +519,21 @@ function CustomerMetricRows({
               </td>
             )}
             <DataCell
-              className={clsx(COL_METRIC, STICKY_Z.body, rowBorder, "bg-white")}
+              className={clsx(
+                COL_METRIC,
+                STICKY_Z.body,
+                cellBorder,
+                "bg-white"
+              )}
             >
               <span className="text-xs leading-none text-slate-500">{metric}</span>
             </DataCell>
-            {values.map((v, i) => (
-              <MonthValueCell
-                key={i}
-                metric={metric}
-                value={v}
-                unit={unit}
-                className={rowBorder}
-              />
-            ))}
+            <MonthColumns
+              metric={metric}
+              unit={unit}
+              values={values}
+              className={clsx(cellBorder, "bg-white")}
+            />
           </tr>
         );
       })}
@@ -449,13 +553,19 @@ function PsiTimelineTable({ items }: { items: PsiItem[] }) {
           demand average
         </p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-0 table-fixed border-separate border-spacing-0 text-left text-sm">
+      <div className="w-full overflow-x-auto">
+        <table
+          className="w-full table-fixed border-collapse text-left text-sm"
+          style={{ minWidth: TABLE_MIN_WIDTH_PX }}
+        >
           <colgroup>
-            <col className="w-16" />
-            <col className="w-[110px]" />
+            <col style={{ width: CUST_COL_PX, minWidth: CUST_COL_PX }} />
+            <col style={{ width: METRIC_COL_PX, minWidth: METRIC_COL_PX }} />
             {PSI_MONTHS.map((_, i) => (
-              <col key={`col-m-${i}`} className="w-[3.25rem]" />
+              <col
+                key={`col-m-${i}`}
+                style={{ width: MONTH_COL_WIDTH, minWidth: MONTH_COL_MIN_PX }}
+              />
             ))}
           </colgroup>
           <thead>
@@ -504,17 +614,18 @@ function PsiTimelineTable({ items }: { items: PsiItem[] }) {
                     className={clsx(
                       cellBase,
                       HEAD_H,
-                      MONTH_COL_W,
+                      MONTH_CELL,
+                      i === MONTH_COUNT - 1 && "border-r-0",
                       "border-b border-slate-200",
                       isCurrent ? "bg-blue-50" : "bg-slate-50"
                     )}
                   >
-                    <div className={clsx(innerHead, "justify-center")}>
+                    <div className={innerMonthHead}>
                       <span
                         className={clsx(
                           "text-xs font-semibold uppercase tracking-wide tabular-nums",
                           isCurrent
-                            ? "border-b-2 border-blue-600 pb-0.5 font-bold text-blue-600"
+                            ? "font-bold text-blue-600"
                             : "text-slate-500"
                         )}
                       >
