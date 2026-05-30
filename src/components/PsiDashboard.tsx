@@ -14,8 +14,9 @@ import { formatNumber } from "@/lib/format";
 import {
   MOS_RISK_THRESHOLD,
   PSI_CURRENT_MONTH_INDEX,
-  PSI_MOCK_ITEMS,
+  PSI_MOCK_SOURCES,
   PSI_MONTHS,
+  buildPsiItems,
   computePsiKpis,
   formatPsiValue,
   isShortageRiskValue,
@@ -23,14 +24,28 @@ import {
   type PsiMetricLine,
 } from "@/lib/psi-mock-data";
 
-function PsiKpiCards() {
-  const kpi = useMemo(() => computePsiKpis(PSI_MOCK_ITEMS), []);
+/** Sticky left columns — solid backgrounds so scrolled values do not bleed through. */
+const STICKY_Z = {
+  head: "z-40",
+  row: "z-30",
+  body: "z-20",
+} as const;
+
+const stickyCol1 =
+  "sticky left-0 min-w-[120px] border-r border-gray-200";
+const stickyCol2 =
+  "sticky left-[120px] min-w-[80px] border-r border-gray-200";
+const stickyCol3 =
+  "sticky left-[200px] min-w-[108px] border-r border-gray-200 shadow-[4px_0_8px_-2px_rgba(15,23,42,0.1)]";
+
+function PsiKpiCards({ items }: { items: PsiItem[] }) {
+  const kpi = useMemo(() => computePsiKpis(items), [items]);
 
   const cards = [
     {
-      label: "Total Forecasted Demand",
-      sub: `${PSI_MONTHS[PSI_CURRENT_MONTH_INDEX]} · all items`,
-      value: formatNumber(kpi.totalForecastedDemand),
+      label: "Total Demand",
+      sub: `${PSI_MONTHS[PSI_CURRENT_MONTH_INDEX]} · actual / forecast roll-up`,
+      value: formatNumber(kpi.totalDemand),
       unit: "kg",
       icon: TrendingUp,
       color: "text-[#396bea]",
@@ -113,24 +128,38 @@ function MetricCell({
   value,
   unit,
 }: {
-  metric: PsiMetricLine;
-  value: number;
+  metric: PsiMetricLine | "Total Demand";
+  value: number | null;
   unit: string;
 }) {
-  const risky = isShortageRiskValue(metric, value);
+  const numeric = value ?? 0;
+  const risky = isShortageRiskValue(
+    metric === "Total Demand" ? "Forecast" : metric,
+    numeric
+  );
+  const display =
+    value === null
+      ? "—"
+      : metric === "Total Demand"
+        ? formatPsiValue("Forecast", numeric, unit)
+        : formatPsiValue(metric, numeric, unit);
+
   return (
     <td
       className={clsx(
         "px-2 py-1 text-right text-xs tabular-nums",
         risky && metric === "Shortage" && "font-medium text-red-500",
-        risky && metric === "Months of Supply" && "bg-red-50 text-red-700"
+        risky && metric === "Months of Supply" && "bg-red-50 text-red-700",
+        metric === "Ending Inventory" &&
+          numeric < 0 &&
+          "bg-red-50/50 text-red-600"
       )}
     >
       <span className="inline-flex items-center justify-end gap-1">
         {risky && metric === "Months of Supply" && (
           <AlertTriangle size={12} className="shrink-0 text-red-500" />
         )}
-        {formatPsiValue(metric, value, unit)}
+        {display}
       </span>
     </td>
   );
@@ -139,22 +168,30 @@ function MetricCell({
 function ItemBlock({ item }: { item: PsiItem }) {
   const [open, setOpen] = useState(item.itemCode === "I/C 905310");
 
-  const totalMetrics: { metric: PsiMetricLine; values: number[] }[] = [
-    { metric: "Beginning Inventory", values: item.totals.beginningInventory },
-    { metric: "Schedule Receipt (ETA)", values: item.totals.scheduleReceipt },
-    { metric: "Ending Inventory", values: item.totals.endingInventory },
-    { metric: "Months of Supply", values: item.totals.monthsOfSupply },
-  ];
+  const totalMetrics = useMemo(
+    (): { metric: PsiMetricLine | "Total Demand"; values: number[] }[] => [
+      { metric: "Total Demand", values: item.totals.totalDemand },
+      { metric: "Beginning Inventory", values: item.totals.beginningInventory },
+      { metric: "Schedule Receipt (ETA)", values: item.totals.scheduleReceipt },
+      { metric: "Ending Inventory", values: item.totals.endingInventory },
+      { metric: "Months of Supply", values: item.totals.monthsOfSupply },
+    ],
+    [item.totals]
+  );
 
   return (
     <>
       <tr
-        className="cursor-pointer border-t border-gray-200 bg-gray-50/80 hover:bg-gray-100"
+        className="cursor-pointer border-t border-gray-200 bg-gray-50 hover:bg-gray-100"
         onClick={() => setOpen((v) => !v)}
       >
         <td
           colSpan={2}
-          className="sticky left-0 z-20 border-r border-gray-200 bg-gray-50/95 px-3 py-2.5"
+          className={clsx(
+            stickyCol1,
+            STICKY_Z.row,
+            "min-w-[200px] bg-gray-50 px-3 py-2.5"
+          )}
         >
           <div className="flex items-center gap-2">
             {open ? (
@@ -170,13 +207,19 @@ function ItemBlock({ item }: { item: PsiItem }) {
             </div>
           </div>
         </td>
-        <td className="sticky left-[200px] z-20 border-r border-gray-200 bg-gray-50/95 px-2 py-2.5 text-xs text-gray-400">
+        <td
+          className={clsx(
+            stickyCol3,
+            STICKY_Z.row,
+            "bg-gray-50 px-2 py-2.5 text-xs text-gray-400"
+          )}
+        >
           {open ? "Collapse" : `${item.customers.length} customers`}
         </td>
-        {PSI_MONTHS.map((m) => (
+        {PSI_MONTHS.map((m, i) => (
           <td
-            key={m}
-            className="bg-gray-50/95 px-2 py-2.5 text-right text-xs text-gray-400"
+            key={`${item.itemCode}-header-${i}`}
+            className="bg-gray-50 px-2 py-2.5 text-right text-xs text-gray-400"
           >
             —
           </td>
@@ -200,15 +243,33 @@ function ItemBlock({ item }: { item: PsiItem }) {
         totalMetrics.map(({ metric, values }) => (
           <tr
             key={`${item.itemCode}-${metric}`}
-            className="border-t border-gray-100 bg-blue-50/30"
+            className="border-t border-gray-100 bg-blue-50"
           >
-            <td className="sticky left-0 z-10 border-r border-gray-200 bg-blue-50/50 px-3 py-1 text-xs font-medium text-gray-600">
+            <td
+              className={clsx(
+                stickyCol1,
+                STICKY_Z.body,
+                "bg-blue-50 px-3 py-1 text-xs font-medium text-gray-600"
+              )}
+            >
               {item.itemCode}
             </td>
-            <td className="sticky left-[120px] z-10 border-r border-gray-200 bg-blue-50/50 px-2 py-1 text-xs text-gray-500">
+            <td
+              className={clsx(
+                stickyCol2,
+                STICKY_Z.body,
+                "bg-blue-50 px-2 py-1 text-xs text-gray-500"
+              )}
+            >
               Total
             </td>
-            <td className="sticky left-[200px] z-10 border-r border-gray-200 bg-blue-50/50 px-2 py-1 text-xs font-semibold text-[#396bea]">
+            <td
+              className={clsx(
+                stickyCol3,
+                STICKY_Z.body,
+                "bg-blue-50 px-2 py-1 text-xs font-semibold text-[#396bea]"
+              )}
+            >
               {metric}
             </td>
             {values.map((v, i) => (
@@ -236,27 +297,46 @@ function CustomerMetricRows({
   itemCode: string;
   cust: string;
   forecast: number[];
-  actual: number[];
+  actual: (number | null)[];
   shortage: number[];
   unit: string;
 }) {
-  const rows: { metric: PsiMetricLine; values: number[] }[] = [
-    { metric: "Forecast", values: forecast },
-    { metric: "Actual", values: actual },
-    { metric: "Shortage", values: shortage },
-  ];
+  const rows: { metric: PsiMetricLine | "Total Demand"; values: (number | null)[] }[] =
+    [
+      { metric: "Forecast", values: forecast },
+      { metric: "Actual", values: actual },
+      { metric: "Shortage", values: shortage },
+    ];
 
   return (
     <>
       {rows.map(({ metric, values }, idx) => (
-        <tr key={`${itemCode}-${cust}-${metric}`} className="hover:bg-gray-50/50">
-          <td className="sticky left-0 z-10 border-r border-gray-100 bg-white px-3 py-1 text-xs text-gray-300">
+        <tr key={`${itemCode}-${cust}-${metric}`} className="hover:bg-gray-50">
+          <td
+            className={clsx(
+              stickyCol1,
+              STICKY_Z.body,
+              "border-gray-100 bg-white px-3 py-1 text-xs text-gray-300"
+            )}
+          >
             {idx === 0 ? itemCode : ""}
           </td>
-          <td className="sticky left-[120px] z-10 border-r border-gray-100 bg-white px-2 py-1 text-xs font-medium text-gray-700">
+          <td
+            className={clsx(
+              stickyCol2,
+              STICKY_Z.body,
+              "border-gray-100 bg-white px-2 py-1 text-xs font-medium text-gray-700"
+            )}
+          >
             {idx === 0 ? cust : ""}
           </td>
-          <td className="sticky left-[200px] z-10 border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-500">
+          <td
+            className={clsx(
+              stickyCol3,
+              STICKY_Z.body,
+              "bg-white px-2 py-1 text-xs text-gray-500"
+            )}
+          >
             {metric}
           </td>
           {values.map((v, i) => (
@@ -268,7 +348,7 @@ function CustomerMetricRows({
   );
 }
 
-function PsiTimelineTable() {
+function PsiTimelineTable({ items }: { items: PsiItem[] }) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 px-4 py-3">
@@ -276,34 +356,52 @@ function PsiTimelineTable() {
           PSI / Demantra Timeline
         </h2>
         <p className="mt-0.5 text-xs text-gray-500">
-          Expand an item to view customer Forecast · Actual · Shortage and
-          inventory roll-ups. Scroll horizontally for 14+ months.
+          Demand = posted actual (incl. 0) per branch, else 0; Beginning →
+          +Receipts −Demand = Ending; MoS = Ending ÷ avg(next 3 months demand).
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[1200px] border-collapse text-left text-sm">
+        <table className="min-w-[1200px] border-separate border-spacing-0 text-left text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <th className="sticky left-0 z-30 min-w-[120px] border-r border-gray-200 bg-gray-50 px-3 py-3">
+              <th
+                className={clsx(
+                  stickyCol1,
+                  STICKY_Z.head,
+                  "border-b border-gray-200 bg-gray-50 px-3 py-3"
+                )}
+              >
                 Item Code
               </th>
-              <th className="sticky left-[120px] z-30 min-w-[72px] border-r border-gray-200 bg-gray-50 px-2 py-3">
+              <th
+                className={clsx(
+                  stickyCol2,
+                  STICKY_Z.head,
+                  "border-b border-gray-200 bg-gray-50 px-2 py-3"
+                )}
+              >
                 Cust
               </th>
-              <th className="sticky left-[200px] z-30 min-w-[100px] border-r border-gray-200 bg-gray-50 px-2 py-3">
+              <th
+                className={clsx(
+                  stickyCol3,
+                  STICKY_Z.head,
+                  "border-b border-gray-200 bg-gray-50 px-2 py-3"
+                )}
+              >
                 Metric
               </th>
-              {PSI_MONTHS.map((m) => (
+              {PSI_MONTHS.map((m, i) => (
                 <th
-                  key={m}
+                  key={`${m}-${i}`}
                   className={clsx(
                     "min-w-[72px] px-2 py-3 text-right",
-                    m === PSI_MONTHS[PSI_CURRENT_MONTH_INDEX] &&
+                    i === PSI_CURRENT_MONTH_INDEX &&
                       "bg-blue-50/80 text-[#396bea]"
                   )}
                 >
                   {m}
-                  {m === PSI_MONTHS[PSI_CURRENT_MONTH_INDEX] && (
+                  {i === PSI_CURRENT_MONTH_INDEX && (
                     <span className="mt-0.5 block text-[10px] font-normal normal-case text-blue-400">
                       current
                     </span>
@@ -313,7 +411,7 @@ function PsiTimelineTable() {
             </tr>
           </thead>
           <tbody>
-            {PSI_MOCK_ITEMS.map((item) => (
+            {items.map((item) => (
               <ItemBlock key={item.itemCode} item={item} />
             ))}
           </tbody>
@@ -324,13 +422,18 @@ function PsiTimelineTable() {
 }
 
 export function PsiDashboard() {
+  const items = useMemo(
+    () => buildPsiItems(PSI_MOCK_SOURCES),
+    []
+  );
+
   return (
     <div className="space-y-6">
-      <PsiKpiCards />
-      <PsiTimelineTable />
+      <PsiKpiCards items={items} />
+      <PsiTimelineTable items={items} />
       <p className="text-xs text-gray-400">
-        Mock data · Apr 2026 – May 2027 · MoS risk threshold {MOS_RISK_THRESHOLD}{" "}
-        months · Connect to Demantra API in a later phase.
+        Mock inputs · roll-forward inventory · MoS risk &lt; {MOS_RISK_THRESHOLD}{" "}
+        months
       </p>
     </div>
   );
