@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   FileUp,
   Database,
+  LineChart,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -15,6 +16,7 @@ const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inventory", label: "Stock Items", icon: Package },
   { href: "/movements", label: "Stock Movements", icon: ArrowLeftRight },
+  { href: "/psi", label: "SCM / PSI", icon: LineChart },
   { href: "/import", label: "Data Import", icon: FileUp },
 ];
 

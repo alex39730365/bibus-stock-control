@@ -34,8 +34,8 @@ export const PRODUCT_FORMS: ProductForm[] = [
 
 export type StockStatus = "ok" | "low" | "out";
 
-/** BMAG = Switzerland (AG), BMCN = China (CN), BMKR = Korea */
-export type Region = "BMAG" | "BMCN" | "BMKR";
+/** BMAG = Switzerland (AG), BMCN = China (CN) */
+export type Region = "BMAG" | "BMCN";
 
 export interface InventoryItem {
   id: string;

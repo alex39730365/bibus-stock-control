@@ -4,10 +4,6 @@ import type { ImportResult, InventoryItem, ProductForm } from "./types";
 import { PRODUCT_FORMS, defaultUnitForForm } from "./types";
 import { generateId } from "./storage";
 import {
-  isBmkrOrderingWorkbook,
-  parseBmkrOrderingWorkbook,
-} from "./bmkr-ordering-import";
-import {
   isCentralizationWorkbook,
   parseCentralizationWorkbook,
 } from "./centralization-import";
@@ -133,20 +129,6 @@ export function parseExcelBuffer(buffer: ArrayBuffer): ParseExcelResult {
     };
   }
 
-  if (isBmkrOrderingWorkbook(workbook)) {
-    const items = parseBmkrOrderingWorkbook(workbook);
-    return {
-      imported: items.length,
-      updated: 0,
-      skipped: 0,
-      errors:
-        items.length === 0
-          ? ["No ordering rows found in Demantra sheet."]
-          : [],
-      items,
-    };
-  }
-
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
     return {
@@ -213,9 +195,7 @@ export function parseExcelBuffer(buffer: ArrayBuffer): ParseExcelResult {
     items.push({
       id: generateId(),
       region:
-        partial.region === "BMCN" ||
-        partial.region === "BMAG" ||
-        partial.region === "BMKR"
+        partial.region === "BMCN" || partial.region === "BMAG"
           ? partial.region
           : "BMAG",
       articleNo: partial.articleNo,
