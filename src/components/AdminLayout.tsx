@@ -17,11 +17,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen w-full">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminHeader username={username ?? "…"} />
-        <main className="flex-1 overflow-auto bg-[#f5f6f8]">{children}</main>
+        <main className="flex-1 w-full max-w-full overflow-auto bg-[#f5f6f8]">
+          {children}
+        </main>
       </div>
     </div>
   );

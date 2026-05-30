@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import {
   AlertTriangle,
@@ -10,111 +10,179 @@ import {
   TrendingUp,
   Truck,
 } from "lucide-react";
+import { EndingInventorySparkline } from "@/components/psi/EndingInventorySparkline";
 import { formatNumber } from "@/lib/format";
 import {
+  MOS_DANGER_THRESHOLD,
   MOS_RISK_THRESHOLD,
   PSI_CURRENT_MONTH_INDEX,
   PSI_MOCK_SOURCES,
   PSI_MONTHS,
   buildPsiItems,
+  formatPsiMonthLabel,
   computePsiKpis,
+  formatPortfolioAvgMos,
   formatPsiValue,
-  isShortageRiskValue,
+  getMosTier,
+  type MosTier,
   type PsiItem,
   type PsiMetricLine,
 } from "@/lib/psi-mock-data";
 
-/** Sticky left columns — solid backgrounds so scrolled values do not bleed through. */
-const STICKY_Z = {
-  head: "z-40",
-  row: "z-30",
-  body: "z-20",
-} as const;
+const STICKY_Z = { head: "z-40", row: "z-30", body: "z-20" } as const;
 
-const stickyCol1 =
-  "sticky left-0 min-w-[120px] border-r border-gray-200";
-const stickyCol2 =
-  "sticky left-[120px] min-w-[80px] border-r border-gray-200";
-const stickyCol3 =
-  "sticky left-[200px] min-w-[108px] border-r border-gray-200 shadow-[4px_0_8px_-2px_rgba(15,23,42,0.1)]";
+const MONTH_COUNT = PSI_MONTHS.length;
+/** Cust + Metric + month columns */
+const TABLE_COL_COUNT = 2 + MONTH_COUNT;
+
+const ITEM_HEADER_H = "h-10 max-h-10";
+const DATA_ROW = "h-8 max-h-8";
+const HEAD_H = "h-10 max-h-10";
+
+/** Sticky left: Cust 64px + Metric 110px */
+const COL_CUST =
+  "sticky left-0 w-16 min-w-16 max-w-16 border-r border-slate-200";
+const COL_METRIC =
+  "sticky left-16 w-[110px] min-w-[110px] max-w-[110px] border-r border-slate-200 shadow-[4px_0_8px_-2px_rgba(15,23,42,0.06)]";
+
+const MONTH_COL_W = "w-[3.25rem] min-w-[3.25rem] max-w-[3.25rem]";
+
+const cellBase = "whitespace-nowrap p-0 align-middle leading-none";
+const innerData = "flex h-8 max-h-8 items-center px-2 py-1";
+const innerHead = "flex h-10 max-h-10 items-center px-2 py-2";
+
+const METRICS_PER_CUST = 3;
+
+/** Borders inside a customer bundle vs between customers. */
+function customerRowBorder(metric: PsiMetricLine): string {
+  if (metric === "Shortage") {
+    return "border-b border-slate-200";
+  }
+  if (metric === "Actual") {
+    return "border-b border-slate-50";
+  }
+  return "";
+}
+
+const MOS_DOT: Record<MosTier, string> = {
+  danger: "bg-red-500",
+  warning: "bg-amber-500",
+  safe: "bg-emerald-500",
+};
+
+const MOS_TEXT: Record<MosTier, string> = {
+  danger: "text-red-700",
+  warning: "text-amber-700",
+  safe: "text-emerald-700",
+};
+
+function DataCell({
+  className,
+  align = "left",
+  children,
+  stickyZ,
+}: {
+  className?: string;
+  align?: "left" | "center" | "right";
+  children: ReactNode;
+  stickyZ?: string;
+}) {
+  return (
+    <td className={clsx(cellBase, DATA_ROW, stickyZ, className)}>
+      <div
+        className={clsx(
+          innerData,
+          align === "center" && "justify-center",
+          align === "right" && "justify-end"
+        )}
+      >
+        {children}
+      </div>
+    </td>
+  );
+}
 
 function PsiKpiCards({ items }: { items: PsiItem[] }) {
   const kpi = useMemo(() => computePsiKpis(items), [items]);
+  const avgMosKpi = formatPortfolioAvgMos(kpi.avgMonthsOfSupply);
 
   const cards = [
     {
       label: "Total Demand",
-      sub: `${PSI_MONTHS[PSI_CURRENT_MONTH_INDEX]} · actual / forecast roll-up`,
+      sub: `${formatPsiMonthLabel(PSI_CURRENT_MONTH_INDEX)} · roll-up`,
       value: formatNumber(kpi.totalDemand),
       unit: "kg",
       icon: TrendingUp,
-      color: "text-[#396bea]",
-      bg: "bg-blue-50",
-      alert: false,
+      iconWrap: "bg-blue-50",
+      iconClass: "text-[#396bea]",
     },
     {
-      label: "Active Shortage Items",
+      label: "Shortage Risk Items",
       sub: `MoS < ${MOS_RISK_THRESHOLD.toFixed(1)} months`,
       value: formatNumber(kpi.activeShortageItems),
       unit: "items",
       icon: AlertTriangle,
-      color: "text-red-600",
-      bg: "bg-red-50",
+      iconWrap: "bg-red-50",
+      iconClass: "text-red-600",
       alert: true,
     },
     {
-      label: "Total Schedule Receipts",
+      label: "Schedule Receipts",
       sub: "ETA this month",
       value: formatNumber(kpi.totalScheduleReceipts),
       unit: "kg",
       icon: Truck,
-      color: "text-emerald-700",
-      bg: "bg-emerald-50",
-      alert: false,
+      iconWrap: "bg-emerald-50",
+      iconClass: "text-emerald-700",
     },
     {
       label: "Avg Months of Supply",
       sub: "Portfolio average",
-      value: kpi.avgMonthsOfSupply.toFixed(1),
-      unit: "months",
+      value: avgMosKpi.display,
+      unit: avgMosKpi.unit,
       icon: CalendarRange,
-      color:
-        kpi.avgMonthsOfSupply < MOS_RISK_THRESHOLD
-          ? "text-red-600"
-          : "text-gray-700",
-      bg:
-        kpi.avgMonthsOfSupply < MOS_RISK_THRESHOLD
-          ? "bg-red-50"
-          : "bg-gray-100",
-      alert: kpi.avgMonthsOfSupply < MOS_RISK_THRESHOLD,
+      iconWrap: avgMosKpi.alert ? "bg-amber-50" : "bg-slate-100",
+      iconClass: avgMosKpi.alert ? "text-amber-600" : "text-slate-600",
+      alert: avgMosKpi.alert,
     },
   ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map(
-        ({ label, sub, value, unit, icon: Icon, color, bg, alert }) => (
+        ({
+          label,
+          sub,
+          value,
+          unit,
+          icon: Icon,
+          iconWrap,
+          iconClass,
+          alert,
+        }) => (
           <div
             key={label}
-            className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+            className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <div className={clsx("rounded-lg p-3", bg)}>
-              <Icon className={color} size={22} />
+            <div className={clsx("rounded-lg p-3", iconWrap)}>
+              <Icon className={iconClass} size={22} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-gray-500">{label}</p>
+              <p className="text-sm text-slate-500">{label}</p>
               <p
                 className={clsx(
-                  "text-2xl font-bold",
-                  alert ? "text-red-600" : "text-gray-900"
+                  "text-2xl font-bold tabular-nums text-slate-900",
+                  alert && "text-red-600"
                 )}
               >
                 {value}
-                <span className="ml-1 text-sm font-normal text-gray-500">
-                  {unit}
-                </span>
+                {unit != null && (
+                  <span className="ml-1 text-sm font-normal text-slate-500">
+                    {unit}
+                  </span>
+                )}
               </p>
-              <p className="mt-0.5 text-xs text-gray-400">{sub}</p>
+              <p className="mt-0.5 text-xs text-slate-400">{sub}</p>
             </div>
           </div>
         )
@@ -123,20 +191,39 @@ function PsiKpiCards({ items }: { items: PsiItem[] }) {
   );
 }
 
-function MetricCell({
+function MosDotValue({ value }: { value: number }) {
+  if (!Number.isFinite(value)) {
+    return <span className="text-xs text-slate-400">—</span>;
+  }
+  const tier = getMosTier(value);
+  const label = formatPsiValue("Months of Supply", value, "months");
+
+  return (
+    <span className="inline-flex flex-row items-center justify-center gap-1.5 whitespace-nowrap">
+      <span
+        className={clsx("h-1.5 w-1.5 shrink-0 rounded-full", MOS_DOT[tier])}
+        aria-hidden
+      />
+      <span className={clsx("text-xs tabular-nums leading-none", MOS_TEXT[tier])}>
+        {label}
+      </span>
+    </span>
+  );
+}
+
+function MonthValueCell({
   metric,
   value,
   unit,
+  className,
 }: {
   metric: PsiMetricLine | "Total Demand";
   value: number | null;
   unit: string;
+  className?: string;
 }) {
+  const isMos = metric === "Months of Supply" && value !== null;
   const numeric = value ?? 0;
-  const risky = isShortageRiskValue(
-    metric === "Total Demand" ? "Forecast" : metric,
-    numeric
-  );
   const display =
     value === null
       ? "—"
@@ -144,24 +231,29 @@ function MetricCell({
         ? formatPsiValue("Forecast", numeric, unit)
         : formatPsiValue(metric, numeric, unit);
 
+  const isNegativeShortage = metric === "Shortage" && numeric < 0;
+  const isNegativeEnding = metric === "Ending Inventory" && numeric < 0;
+
   return (
-    <td
-      className={clsx(
-        "px-2 py-1 text-right text-xs tabular-nums",
-        risky && metric === "Shortage" && "font-medium text-red-500",
-        risky && metric === "Months of Supply" && "bg-red-50 text-red-700",
-        metric === "Ending Inventory" &&
-          numeric < 0 &&
-          "bg-red-50/50 text-red-600"
-      )}
+    <DataCell
+      align={isMos ? "center" : "right"}
+      className={clsx("border-slate-100", className)}
     >
-      <span className="inline-flex items-center justify-end gap-1">
-        {risky && metric === "Months of Supply" && (
-          <AlertTriangle size={12} className="shrink-0 text-red-500" />
-        )}
-        {display}
-      </span>
-    </td>
+      {isMos ? (
+        <MosDotValue value={numeric} />
+      ) : (
+        <span
+          className={clsx(
+            "text-xs tabular-nums leading-none",
+            isNegativeShortage && "font-medium text-red-600",
+            isNegativeEnding && "font-medium text-red-600",
+            !isNegativeShortage && !isNegativeEnding && "text-slate-700"
+          )}
+        >
+          {display}
+        </span>
+      )}
+    </DataCell>
   );
 }
 
@@ -181,56 +273,50 @@ function ItemBlock({ item }: { item: PsiItem }) {
 
   return (
     <>
-      <tr
-        className="cursor-pointer border-t border-gray-200 bg-gray-50 hover:bg-gray-100"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <td
-          colSpan={2}
-          className={clsx(
-            stickyCol1,
-            STICKY_Z.row,
-            "min-w-[200px] bg-gray-50 px-3 py-2.5"
-          )}
-        >
-          <div className="flex items-center gap-2">
-            {open ? (
-              <ChevronDown size={16} className="text-gray-500" />
-            ) : (
-              <ChevronRight size={16} className="text-gray-500" />
-            )}
-            <div>
-              <p className="font-mono text-sm font-semibold text-[#396bea]">
+      {/* Item group header — full width, no rowSpan */}
+      <tr className={clsx(ITEM_HEADER_H, "border-t border-slate-200 bg-slate-50")}>
+        <td colSpan={TABLE_COL_COUNT} className="p-0 align-middle">
+          <div className="flex h-10 items-center gap-2 whitespace-nowrap px-3 py-1">
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="flex shrink-0 items-center gap-1.5 rounded-md py-0.5 text-left hover:bg-slate-100"
+              aria-expanded={open}
+            >
+              {open ? (
+                <ChevronDown size={14} className="text-slate-500" />
+              ) : (
+                <ChevronRight size={14} className="text-slate-500" />
+              )}
+              <span className="font-mono text-xs font-semibold text-[#396bea]">
                 {item.itemCode}
-              </p>
-              <p className="text-xs text-gray-500">{item.spec}</p>
-            </div>
+              </span>
+            </button>
+            <span
+              className="hidden min-w-0 truncate text-xs text-slate-500 sm:inline"
+              title={item.spec}
+            >
+              {item.spec}
+            </span>
+            <EndingInventorySparkline
+              values={item.totals.endingInventory}
+              fromMonthIndex={PSI_CURRENT_MONTH_INDEX}
+            />
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="ml-auto shrink-0 text-xs text-slate-400 hover:text-slate-600"
+            >
+              {open ? "Collapse" : "Expand"}
+            </button>
           </div>
         </td>
-        <td
-          className={clsx(
-            stickyCol3,
-            STICKY_Z.row,
-            "bg-gray-50 px-2 py-2.5 text-xs text-gray-400"
-          )}
-        >
-          {open ? "Collapse" : `${item.customers.length} customers`}
-        </td>
-        {PSI_MONTHS.map((m, i) => (
-          <td
-            key={`${item.itemCode}-header-${i}`}
-            className="bg-gray-50 px-2 py-2.5 text-right text-xs text-gray-400"
-          >
-            —
-          </td>
-        ))}
       </tr>
 
       {open &&
         item.customers.map((c) => (
           <CustomerMetricRows
             key={`${item.itemCode}-${c.cust}`}
-            itemCode={item.itemCode}
             cust={c.cust}
             forecast={c.forecast}
             actual={c.actual}
@@ -240,40 +326,37 @@ function ItemBlock({ item }: { item: PsiItem }) {
         ))}
 
       {open &&
-        totalMetrics.map(({ metric, values }) => (
+        totalMetrics.map(({ metric, values }, totalIdx) => (
           <tr
             key={`${item.itemCode}-${metric}`}
-            className="border-t border-gray-100 bg-blue-50"
+            className={clsx(
+              DATA_ROW,
+              "bg-blue-50/50",
+              totalIdx === 0 && "border-t border-slate-200"
+            )}
           >
-            <td
-              className={clsx(
-                stickyCol1,
-                STICKY_Z.body,
-                "bg-blue-50 px-3 py-1 text-xs font-medium text-gray-600"
-              )}
+            <DataCell
+              className={clsx(COL_CUST, STICKY_Z.body, "bg-blue-50")}
+              align="center"
             >
-              {item.itemCode}
-            </td>
-            <td
-              className={clsx(
-                stickyCol2,
-                STICKY_Z.body,
-                "bg-blue-50 px-2 py-1 text-xs text-gray-500"
-              )}
+              {totalIdx === 0 ? (
+                <span className="text-[10px] font-semibold uppercase leading-none text-slate-500">
+                  Total
+                </span>
+              ) : null}
+            </DataCell>
+            <DataCell
+              className={clsx(COL_METRIC, STICKY_Z.body, "bg-blue-50")}
             >
-              Total
-            </td>
-            <td
-              className={clsx(
-                stickyCol3,
-                STICKY_Z.body,
-                "bg-blue-50 px-2 py-1 text-xs font-semibold text-[#396bea]"
-              )}
-            >
-              {metric}
-            </td>
+              <span
+                className="truncate text-xs font-semibold leading-none text-[#396bea]"
+                title={metric}
+              >
+                {metric}
+              </span>
+            </DataCell>
             {values.map((v, i) => (
-              <MetricCell
+              <MonthValueCell
                 key={`${metric}-${i}`}
                 metric={metric}
                 value={v}
@@ -287,130 +370,163 @@ function ItemBlock({ item }: { item: PsiItem }) {
 }
 
 function CustomerMetricRows({
-  itemCode,
   cust,
   forecast,
   actual,
   shortage,
   unit,
 }: {
-  itemCode: string;
   cust: string;
   forecast: number[];
   actual: (number | null)[];
   shortage: number[];
   unit: string;
 }) {
-  const rows: { metric: PsiMetricLine | "Total Demand"; values: (number | null)[] }[] =
-    [
-      { metric: "Forecast", values: forecast },
-      { metric: "Actual", values: actual },
-      { metric: "Shortage", values: shortage },
-    ];
+  const rows: { metric: PsiMetricLine; values: (number | null)[] }[] = [
+    { metric: "Forecast", values: forecast },
+    { metric: "Actual", values: actual },
+    { metric: "Shortage", values: shortage },
+  ];
 
   return (
     <>
-      {rows.map(({ metric, values }, idx) => (
-        <tr key={`${itemCode}-${cust}-${metric}`} className="hover:bg-gray-50">
-          <td
-            className={clsx(
-              stickyCol1,
-              STICKY_Z.body,
-              "border-gray-100 bg-white px-3 py-1 text-xs text-gray-300"
-            )}
+      {rows.map(({ metric, values }) => {
+        const isForecast = metric === "Forecast";
+        const rowBorder = customerRowBorder(metric);
+
+        return (
+          <tr
+            key={`${cust}-${metric}`}
+            className={clsx(DATA_ROW, rowBorder, "hover:bg-slate-50/80")}
           >
-            {idx === 0 ? itemCode : ""}
-          </td>
-          <td
-            className={clsx(
-              stickyCol2,
-              STICKY_Z.body,
-              "border-gray-100 bg-white px-2 py-1 text-xs font-medium text-gray-700"
+            {isForecast && (
+              <td
+                rowSpan={METRICS_PER_CUST}
+                className={clsx(
+                  cellBase,
+                  COL_CUST,
+                  STICKY_Z.body,
+                  "border-b border-slate-200 bg-white align-middle"
+                )}
+              >
+                <div className="flex items-center justify-center px-2 py-1">
+                  <span className="text-xs font-semibold leading-none text-slate-700">
+                    {cust}
+                  </span>
+                </div>
+              </td>
             )}
-          >
-            {idx === 0 ? cust : ""}
-          </td>
-          <td
-            className={clsx(
-              stickyCol3,
-              STICKY_Z.body,
-              "bg-white px-2 py-1 text-xs text-gray-500"
-            )}
-          >
-            {metric}
-          </td>
-          {values.map((v, i) => (
-            <MetricCell key={i} metric={metric} value={v} unit={unit} />
-          ))}
-        </tr>
-      ))}
+            <DataCell
+              className={clsx(COL_METRIC, STICKY_Z.body, rowBorder, "bg-white")}
+            >
+              <span className="text-xs leading-none text-slate-500">{metric}</span>
+            </DataCell>
+            {values.map((v, i) => (
+              <MonthValueCell
+                key={i}
+                metric={metric}
+                value={v}
+                unit={unit}
+                className={rowBorder}
+              />
+            ))}
+          </tr>
+        );
+      })}
     </>
   );
 }
 
 function PsiTimelineTable({ items }: { items: PsiItem[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-800">
+    <div className="w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 bg-white px-4 py-3">
+        <h2 className="text-lg font-semibold text-slate-800">
           PSI / Demantra Timeline
         </h2>
-        <p className="mt-0.5 text-xs text-gray-500">
-          Demand = posted actual (incl. 0) per branch, else 0; Beginning →
-          +Receipts −Demand = Ending; MoS = Ending ÷ avg(next 3 months demand).
+        <p className="mt-0.5 text-xs text-slate-500">
+          Posted actual drives demand · roll-forward ending · MoS from forward
+          demand average
         </p>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[1200px] border-separate border-spacing-0 text-left text-sm">
+        <table className="w-full min-w-0 table-fixed border-separate border-spacing-0 text-left text-sm">
+          <colgroup>
+            <col className="w-16" />
+            <col className="w-[110px]" />
+            {PSI_MONTHS.map((_, i) => (
+              <col key={`col-m-${i}`} className="w-[3.25rem]" />
+            ))}
+          </colgroup>
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <tr className={clsx(HEAD_H, "bg-slate-50 text-slate-500")}>
               <th
                 className={clsx(
-                  stickyCol1,
+                  cellBase,
+                  HEAD_H,
+                  COL_CUST,
                   STICKY_Z.head,
-                  "border-b border-gray-200 bg-gray-50 px-3 py-3"
+                  "border-b border-slate-200 bg-slate-50"
                 )}
               >
-                Item Code
-              </th>
-              <th
-                className={clsx(
-                  stickyCol2,
-                  STICKY_Z.head,
-                  "border-b border-gray-200 bg-gray-50 px-2 py-3"
-                )}
-              >
-                Cust
-              </th>
-              <th
-                className={clsx(
-                  stickyCol3,
-                  STICKY_Z.head,
-                  "border-b border-gray-200 bg-gray-50 px-2 py-3"
-                )}
-              >
-                Metric
-              </th>
-              {PSI_MONTHS.map((m, i) => (
-                <th
-                  key={`${m}-${i}`}
+                <div
                   className={clsx(
-                    "min-w-[72px] px-2 py-3 text-right",
-                    i === PSI_CURRENT_MONTH_INDEX &&
-                      "bg-blue-50/80 text-[#396bea]"
+                    innerHead,
+                    "justify-center text-[10px] font-semibold uppercase tracking-wide"
                   )}
                 >
-                  {m}
-                  {i === PSI_CURRENT_MONTH_INDEX && (
-                    <span className="mt-0.5 block text-[10px] font-normal normal-case text-blue-400">
-                      current
-                    </span>
+                  Cust
+                </div>
+              </th>
+              <th
+                className={clsx(
+                  cellBase,
+                  HEAD_H,
+                  COL_METRIC,
+                  STICKY_Z.head,
+                  "border-b border-slate-200 bg-slate-50"
+                )}
+              >
+                <div
+                  className={clsx(
+                    innerHead,
+                    "text-[10px] font-semibold uppercase tracking-wide"
                   )}
-                </th>
-              ))}
+                >
+                  Metric
+                </div>
+              </th>
+              {PSI_MONTHS.map((month, i) => {
+                const isCurrent = i === PSI_CURRENT_MONTH_INDEX;
+                return (
+                  <th
+                    key={`${month}-${i}`}
+                    className={clsx(
+                      cellBase,
+                      HEAD_H,
+                      MONTH_COL_W,
+                      "border-b border-slate-200",
+                      isCurrent ? "bg-blue-50" : "bg-slate-50"
+                    )}
+                  >
+                    <div className={clsx(innerHead, "justify-center")}>
+                      <span
+                        className={clsx(
+                          "text-xs font-semibold uppercase tracking-wide tabular-nums",
+                          isCurrent
+                            ? "border-b-2 border-blue-600 pb-0.5 font-bold text-blue-600"
+                            : "text-slate-500"
+                        )}
+                      >
+                        {month.toUpperCase()}
+                      </span>
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="bg-white">
             {items.map((item) => (
               <ItemBlock key={item.itemCode} item={item} />
             ))}
@@ -422,18 +538,15 @@ function PsiTimelineTable({ items }: { items: PsiItem[] }) {
 }
 
 export function PsiDashboard() {
-  const items = useMemo(
-    () => buildPsiItems(PSI_MOCK_SOURCES),
-    []
-  );
+  const items = useMemo(() => buildPsiItems(PSI_MOCK_SOURCES), []);
 
   return (
     <div className="space-y-6">
       <PsiKpiCards items={items} />
       <PsiTimelineTable items={items} />
-      <p className="text-xs text-gray-400">
-        Mock inputs · roll-forward inventory · MoS risk &lt; {MOS_RISK_THRESHOLD}{" "}
-        months
+      <p className="text-xs text-slate-400">
+        Mock data · MoS danger &lt; {MOS_DANGER_THRESHOLD} mo · target ≥
+        {MOS_RISK_THRESHOLD} mo
       </p>
     </div>
   );

@@ -21,7 +21,58 @@ export const PSI_MONTHS = [
 
 export type PsiMonthKey = (typeof PSI_MONTHS)[number];
 
+const CALENDAR_MONTH_INDEX: Record<string, number> = {
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  May: 4,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
+};
+
+/** Timeline labels: Apr 2026 → May 2027 (matches Demantra / ordering workbook). */
+export interface PsiTimelineMonth {
+  month: PsiMonthKey;
+  year: number;
+  /** e.g. `Apr '26` */
+  label: string;
+}
+
+function buildPsiMonthColumns(): PsiTimelineMonth[] {
+  let year = 2026;
+  let prevCal = -1;
+  return PSI_MONTHS.map((month) => {
+    const cal = CALENDAR_MONTH_INDEX[month] ?? 0;
+    if (prevCal >= 0 && cal < prevCal) year += 1;
+    prevCal = cal;
+    const shortYear = String(year).slice(-2);
+    return { month, year, label: `${month} '${shortYear}` };
+  });
+}
+
+export const PSI_MONTH_COLUMNS = buildPsiMonthColumns();
+
+export function formatPsiMonthLabel(monthIndex: number): string {
+  return PSI_MONTH_COLUMNS[monthIndex]?.label ?? PSI_MONTHS[monthIndex] ?? "";
+}
+
 export const MOS_RISK_THRESHOLD = 3.0;
+/** Below 1 month of supply → danger tier (badge dot). */
+export const MOS_DANGER_THRESHOLD = 1.0;
+
+export type MosTier = "safe" | "warning" | "danger";
+
+export function getMosTier(mos: number): MosTier {
+  if (!Number.isFinite(mos) || mos < MOS_DANGER_THRESHOLD) return "danger";
+  if (mos < MOS_RISK_THRESHOLD) return "warning";
+  return "safe";
+}
 
 export type PsiMetricLine =
   | "Forecast"
@@ -68,11 +119,44 @@ export interface PsiKpiSummary {
   totalDemand: number;
   activeShortageItems: number;
   totalScheduleReceipts: number;
-  avgMonthsOfSupply: number;
+  /** Portfolio MoS; `null` when not computable (empty portfolio, NaN, etc.). */
+  avgMonthsOfSupply: number | null;
+}
+
+export interface PortfolioAvgMosDisplay {
+  display: string;
+  unit: string | null;
+  alert: boolean;
+}
+
+/** KPI card formatting — no `Infinity mo` leakage. */
+export function formatPortfolioAvgMos(
+  value: number | null | undefined
+): PortfolioAvgMosDisplay {
+  if (
+    value == null ||
+    !Number.isFinite(value) ||
+    Number.isNaN(value)
+  ) {
+    return { display: "—", unit: null, alert: false };
+  }
+  return {
+    display: value.toFixed(1),
+    unit: "mo",
+    alert: value < MOS_RISK_THRESHOLD,
+  };
 }
 
 /** Current month index for KPI focus (May = index 1 in this mock). */
 export const PSI_CURRENT_MONTH_INDEX = 1;
+
+/** True when ending inventory goes negative from `fromMonthIndex` onward. */
+export function hasFutureEndingShortage(
+  endingInventory: number[],
+  fromMonthIndex: number = PSI_CURRENT_MONTH_INDEX
+): boolean {
+  return endingInventory.slice(fromMonthIndex).some((v) => v < 0);
+}
 
 const MONTH_COUNT = PSI_MONTHS.length;
 
@@ -167,7 +251,11 @@ export function computeItemTotals(source: PsiItemSource): PsiItemTotals {
     endingInventory.push(ending);
 
     const forwardAvg = avgForwardTotalDemand(totalDemand, i);
-    monthsOfSupply.push(ending / forwardAvg);
+    const mos =
+      forwardAvg === 0 || !Number.isFinite(forwardAvg)
+        ? 0
+        : ending / forwardAvg;
+    monthsOfSupply.push(Number.isFinite(mos) ? mos : 0);
   }
 
   return {
@@ -368,25 +456,56 @@ export function computePsiKpis(items: PsiItem[]): PsiKpiSummary {
   const mi = PSI_CURRENT_MONTH_INDEX;
   let totalDemand = 0;
   let totalScheduleReceipts = 0;
-  let mosSum = 0;
+  let totalEnding = 0;
+  let totalForwardDemand = 0;
+  let finiteMosSum = 0;
+  let finiteMosCount = 0;
   let activeShortageItems = 0;
 
   for (const item of items) {
     totalDemand += item.totals.totalDemand[mi] ?? 0;
     totalScheduleReceipts += item.totals.scheduleReceipt[mi] ?? 0;
-    const mos = item.totals.monthsOfSupply[mi] ?? 0;
-    mosSum += mos;
+
+    const ending = item.totals.endingInventory[mi] ?? 0;
+    const forwardAvg = avgForwardTotalDemand(item.totals.totalDemand, mi);
+    if (Number.isFinite(ending)) totalEnding += ending;
+    if (Number.isFinite(forwardAvg)) totalForwardDemand += forwardAvg;
+
+    const mos = item.totals.monthsOfSupply[mi];
+    if (typeof mos === "number" && Number.isFinite(mos)) {
+      finiteMosSum += mos;
+      finiteMosCount += 1;
+    }
+
     const riskyMonth = item.totals.monthsOfSupply.some(
-      (m) => m < MOS_RISK_THRESHOLD
+      (m) => Number.isFinite(m) && m < MOS_RISK_THRESHOLD
     );
     if (riskyMonth) activeShortageItems += 1;
+  }
+
+  let avgMonthsOfSupply: number | null = null;
+  if (items.length === 0) {
+    avgMonthsOfSupply = null;
+  } else if (totalForwardDemand === 0) {
+    avgMonthsOfSupply = 0;
+  } else {
+    const ratio = totalEnding / totalForwardDemand;
+    avgMonthsOfSupply = Number.isFinite(ratio) ? ratio : null;
+  }
+
+  if (
+    avgMonthsOfSupply == null &&
+    finiteMosCount > 0
+  ) {
+    const mean = finiteMosSum / finiteMosCount;
+    avgMonthsOfSupply = Number.isFinite(mean) ? mean : null;
   }
 
   return {
     totalDemand,
     activeShortageItems,
     totalScheduleReceipts,
-    avgMonthsOfSupply: items.length ? mosSum / items.length : 0,
+    avgMonthsOfSupply,
   };
 }
 
